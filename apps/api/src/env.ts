@@ -20,6 +20,10 @@ const EnvSchema = z.object({
   PORT: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(65535).default(4000)),
   SUPABASE_URL: z.preprocess(emptyToUndefined, z.url({ protocol: /^https?$/ }).optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  // Bật Swagger UI ở /api-docs và tài liệu ở /openapi.json. Đặt "false" để tắt.
+  API_DOCS: z
+    .preprocess(emptyToUndefined, z.enum(["true", "false"]).default("true"))
+    .transform((value) => value === "true"),
   CORS_ORIGINS: z
     .preprocess(emptyToUndefined, z.string().default("http://localhost:3000,http://localhost:3001"))
     .transform((value) =>

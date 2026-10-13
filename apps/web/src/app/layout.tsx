@@ -21,8 +21,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="vi">
-      <body>{children}</body>
+    // suppressHydrationWarning: tiện ích trình duyệt (ColorZilla, VPN, chặn quảng cáo...) hay chèn thuộc tính
+    // vào <html>/<body> trước khi React chạy, gây cảnh báo hydration giả. Chỉ bỏ qua thuộc tính của
+    // CHÍNH 2 thẻ này, không che lỗi hydration thật ở các thành phần bên trong.
+    <html lang="vi" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

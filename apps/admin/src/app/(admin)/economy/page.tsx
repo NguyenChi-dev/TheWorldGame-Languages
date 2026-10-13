@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import { SEED_LIST } from "@lw/shared";
+import { ADMIN_SECTIONS, SEED_LIST } from "@lw/shared";
 import { Panel } from "@lw/ui";
 import { PageTitle } from "@/components/page-title";
+import { requireSection } from "@/lib/auth";
 
-export const metadata: Metadata = { title: "Vật phẩm" };
+export const metadata: Metadata = { title: ADMIN_SECTIONS.economy.label };
 
-export default function ItemsPage() {
+export default async function EconomyPage() {
+  await requireSection("economy");
+
   return (
     <>
-      <PageTitle>Vật phẩm</PageTitle>
+      <PageTitle>{ADMIN_SECTIONS.economy.label}</PageTitle>
       <Panel title={`Hạt giống (${SEED_LIST.length})`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

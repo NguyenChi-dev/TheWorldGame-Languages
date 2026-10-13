@@ -12,6 +12,7 @@ export const Messages = {
   unauthenticated: "Chưa đăng nhập",
   invalidSession: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn",
   forbiddenAdmin: "Bạn không có quyền truy cập trang quản trị",
+  mfaRequired: "Cần xác thực hai lớp (TOTP) trước khi dùng chức năng quản trị",
   supabaseNotConfigured: "Chưa cấu hình Supabase",
   supabaseUnavailable: "Không kết nối được tới Supabase, vui lòng thử lại sau",
   invalidInput: "Dữ liệu gửi lên không hợp lệ",

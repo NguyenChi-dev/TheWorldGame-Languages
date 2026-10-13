@@ -23,6 +23,15 @@ pnpm --filter @lw/api start              # chạy bản đã build
 
 `pnpm dev` ở thư mục gốc cũng chạy luôn API cùng các app khác.
 
+### Swagger UI
+
+Mở **http://localhost:4000/api-docs** để xem và gọi thử mọi route (đặc tả OpenAPI ở `/openapi.json`).
+Route cần đăng nhập: bấm **Authorize**, dán `access_token` Supabase (cách lấy ghi ngay đầu trang docs).
+
+Tài liệu sinh tự động từ schema Zod trong `@lw/shared/api` (xem `src/openapi.ts`), nên luôn khớp với
+cách API kiểm tra dữ liệu. Thêm route mới thì thêm 1 dòng vào `ROUTES` trong `src/openapi.ts`;
+`src/openapi.test.ts` sẽ báo lỗi nếu quên.
+
 ### Biến môi trường (`apps/api/.env`)
 
 | Biến                        | Mặc định                                      | Ghi chú                                          |
@@ -31,6 +40,7 @@ pnpm --filter @lw/api start              # chạy bản đã build
 | `SUPABASE_URL`              | (trống)                                       | Thiếu thì route cần đăng nhập trả 503            |
 | `SUPABASE_SERVICE_ROLE_KEY` | (trống)                                       | **KHÓA BÍ MẬT**, không bao giờ đưa vào web/admin |
 | `CORS_ORIGINS`              | `http://localhost:3000,http://localhost:3001` | Các trang web được phép gọi API                  |
+| `API_DOCS`                  | `true`                                        | `false` để tắt `/api-docs` và `/openapi.json`    |
 
 Khi thiếu Supabase, máy chủ vẫn chạy và in cảnh báo; các route cần đăng nhập trả
 `503 { "error": "Chưa cấu hình Supabase" }` thay vì làm sập máy chủ.
@@ -39,6 +49,8 @@ Khi thiếu Supabase, máy chủ vẫn chạy và in cảnh báo; các route c�
 
 | Route                      | Đăng nhập | Trạng thái | Việc làm                                           |
 | -------------------------- | --------- | ---------- | -------------------------------------------------- |
+| `GET /api-docs`            | không     | chạy được  | Swagger UI (tắt bằng `API_DOCS=false`)             |
+| `GET /openapi.json`        | không     | chạy được  | Đặc tả OpenAPI 3.1                                 |
 | `GET /health`              | không     | chạy được  | `{ ok: true, service: "api", time }`               |
 | `GET /catalog/seeds`       | không     | chạy được  | `{ seeds: [...] }` lấy từ `@lw/shared`             |
 | `GET /me`                  | có        | chạy được  | `{ id, email }` của người đang đăng nhập           |
@@ -48,18 +60,19 @@ Khi thiếu Supabase, máy chủ vẫn chạy và in cảnh báo; các route c�
 | `POST /shop/buy`           | có        | khung, 501 | Mua `{ itemId, quantity }` → `{ gold, inventory }` |
 | `POST /shop/sell`          | có        | khung, 501 | Bán `{ itemId, quantity }` → `{ gold, inventory }` |
 | `POST /lessons/:id/submit` | có        | khung, 501 | Nộp bài `{ answers: [{ wordId, answer }] }`        |
-| `GET /admin/stats?days=7`  | admin     | khung, 501 | Thống kê cho trang quản trị                        |
+| `GET /admin/me`            | nhân viên | chạy được  | `{ id, email, role }` của nhân viên đang đăng nhập |
+| `GET /admin/stats?days=7`  | nhân viên | khung, 501 | Thống kê cho trang quản trị                        |
 
 Mọi lỗi đều có dạng `{ "error": "<thông báo tiếng Việt>" }`:
 
-| Mã  | Khi nào                                                               |
-| --- | --------------------------------------------------------------------- |
-| 400 | Dữ liệu gửi lên sai, ví dụ `"Dữ liệu gửi lên không hợp lệ: plotId"`   |
-| 401 | Không có token, hoặc token sai/hết hạn                                |
-| 403 | Không phải admin, hoặc gọi từ trang web không có trong `CORS_ORIGINS` |
-| 404 | Đường dẫn không tồn tại                                               |
-| 501 | Route mới có khung, chưa làm                                          |
-| 503 | Chưa cấu hình Supabase, hoặc không kết nối được Supabase              |
+| Mã  | Khi nào                                                             |
+| --- | ------------------------------------------------------------------- |
+| 400 | Dữ liệu gửi lên sai, ví dụ `"Dữ liệu gửi lên không hợp lệ: plotId"` |
+| 401 | Không có token, hoặc token sai/hết hạn                              |
+| 403 | Không phải nhân viên, token chưa qua TOTP, hoặc nguồn lạ (CORS)     |
+| 404 | Đường dẫn không tồn tại                                             |
+| 501 | Route mới có khung, chưa làm                                        |
+| 503 | Chưa cấu hình Supabase, hoặc không kết nối được Supabase            |
 
 ### Thử bằng curl
 
@@ -81,13 +94,14 @@ sẽ tự gắn token này, xem `apps/web/src/lib/api.ts`).
 ```
 src/
 ├── index.ts            khởi động máy chủ (cổng, cảnh báo thiếu Supabase)
-├── app.ts              ghép app: chặn nguồn lạ, CORS, giới hạn 64 KB, các route, xử lý lỗi
+├── app.ts              ghép app: chặn nguồn lạ, CORS, giới hạn 64 KB, các route, /api-docs, xử lý lỗi
+├── openapi.ts          tài liệu OpenAPI (Swagger) sinh từ schema Zod, mỗi route 1 dòng trong ROUTES
 ├── env.ts              đọc và kiểm tra biến môi trường bằng Zod
 ├── routes/             mỗi file một nhóm đường dẫn; chỉ nhận yêu cầu và trả kết quả
 ├── services/           logic nghiệp vụ (tính toán, quy tắc game), không biết gì về HTTP
 ├── middleware/
 │   ├── auth.ts         kiểm tra token Supabase, gắn user vào context: c.get("user")
-│   └── require-admin.ts đọc profiles.role trong database, chặn nếu không phải admin
+│   └── require-role.ts requireRole([...]): đọc profiles.role, bắt buộc token đã qua TOTP (aal2)
 └── lib/
     ├── supabase.ts     client Supabase dùng khóa bí mật (null nếu chưa cấu hình)
     ├── validate.ts     validate("json" | "query" | "param", schema): kiểm tra dữ liệu bằng Zod
@@ -137,7 +151,9 @@ Nếu là nhóm đường dẫn mới (file mới trong `routes/`), nhớ gắn 
 gift: (body: GiftRequest) => apiFetch<GiftResponse>("/shop/gift", { method: "POST", body }),
 ```
 
-**5. Viết test** (xem mục dưới), chạy `pnpm --filter @lw/api test`.
+**5. Thêm vào tài liệu Swagger:** 1 dòng trong `ROUTES` của `src/openapi.ts`.
+
+**6. Viết test** (xem mục dưới), chạy `pnpm --filter @lw/api test`.
 
 Quy tắc khi viết route:
 
@@ -157,6 +173,7 @@ Dùng **Vitest**. File test đặt cạnh file được test, tên kết thúc b
 | `src/services/farm.service.test.ts` | Hàm `isReady` thuần: cây chín đúng lúc, nhận chuỗi ISO, dữ liệu lỗi |
 | `src/app.test.ts`                   | Gọi route thật bằng `app.request()`: health, 401, 503, CORS, 404    |
 | `src/routes/routes.test.ts`         | Thay Supabase bằng bản giả (`vi.mock`) để thử token, 400, 403, 501  |
+| `src/openapi.test.ts`               | Tài liệu Swagger khớp đủ route thật, `/api-docs` chạy, tắt được     |
 
 Một test cơ bản:
 
@@ -176,11 +193,14 @@ describe("isReady", () => {
 Test luôn chạy với Supabase **để trống** (đặt trong `vitest.config.ts`), nên không bao giờ
 chạm vào dữ liệu thật, kể cả khi máy bạn có file `.env`.
 
-## Cấp quyền admin
+## Vai trò và cấp quyền
 
-Vai trò nằm ở cột `profiles.role` (`player` hoặc `admin`, mặc định `player`), thêm bởi migration
-`supabase/migrations/*_add_profile_role.sql`. Người chơi không tự sửa được cột này. Để cấp quyền,
-chạy trong SQL editor của Supabase:
+"Nhân viên" là tài khoản có `profiles.role` là `admin`, `editor` hoặc `moderator` (enum `user_role`,
+mặc định `player`). Route `/admin/*` còn đòi token đã qua xác thực hai lớp (claim `aal` = `aal2`),
+giống trang quản trị và RLS. Route chỉ dành cho một số vai trò: thêm `requireRole(["admin"])` riêng.
+
+Tài khoản mới (đăng ký ở game hoặc `apps/admin/signup`) tự có hồ sơ vai trò `player`. Admin cấp
+vai trò ở trang **Người chơi** của `apps/admin` (có ghi nhật ký), hoặc chạy trong SQL editor:
 
 ```sql
 update public.profiles set role = 'admin' where id = '<uuid của người dùng>';

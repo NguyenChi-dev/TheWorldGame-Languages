@@ -14,6 +14,8 @@ import { getSupabaseAdmin } from "../lib/supabase.js";
 export interface AuthUser {
   id: string;
   email: string | null;
+  /** Mức xác thực của token: "aal1" = chỉ mật khẩu, "aal2" = đã qua xác thực hai lớp. */
+  aal: string;
 }
 
 /** Kiểu "môi trường" của Hono cho các route cần đăng nhập. */
@@ -52,6 +54,6 @@ export const auth = createMiddleware<AuthEnv>(async (c, next) => {
     throw new ApiError(401, Messages.invalidSession);
   }
 
-  c.set("user", { id: claims.sub, email: claims.email || null });
+  c.set("user", { id: claims.sub, email: claims.email || null, aal: claims.aal ?? "aal1" });
   await next();
 });

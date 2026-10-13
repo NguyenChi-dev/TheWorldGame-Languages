@@ -2,22 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "@/app/(auth)/actions";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Tổng quan" },
-  { href: "/words", label: "Từ vựng" },
-  { href: "/items", label: "Vật phẩm" },
-  { href: "/players", label: "Người chơi" },
-] as const;
+export interface SidebarItem {
+  href: string;
+  label: string;
+}
 
-export function Sidebar() {
+/** Danh sách `items` đã được lọc theo vai trò ở máy chủ (app/(admin)/layout.tsx). */
+export function Sidebar({
+  items,
+  email,
+  roleLabel,
+}: {
+  items: SidebarItem[];
+  email: string | null;
+  roleLabel: string;
+}) {
   const pathname = usePathname();
 
   return (
-    <aside className="bg-slate-900 text-slate-100 md:w-56 md:shrink-0">
+    <aside className="flex flex-col bg-slate-900 text-slate-100 md:w-56 md:shrink-0">
       <div className="px-5 py-4 text-lg font-bold">LW Admin</div>
       <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:overflow-visible">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
             <Link
@@ -32,6 +40,13 @@ export function Sidebar() {
           );
         })}
       </nav>
+      <form action={signOut} className="mt-auto border-t border-slate-800 px-5 py-4 text-sm">
+        <p className="truncate text-slate-300">{email}</p>
+        <p className="mb-2 text-xs text-slate-500">{roleLabel}</p>
+        <button type="submit" className="text-slate-300 underline hover:text-white">
+          Đăng xuất
+        </button>
+      </form>
     </aside>
   );
 }

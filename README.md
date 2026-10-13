@@ -24,7 +24,8 @@ language-world/
 ├── supabase/
 │   ├── config.toml cấu hình Supabase CLI
 │   ├── migrations/ file SQL tạo bảng + bảo mật RLS
-│   └── seed.sql    dữ liệu mẫu (1 vùng đất, 10 từ, 3 hạt giống)
+│   ├── tests/      test SQL (pgTAP) cho RLS và admin_logs
+│   └── seed.sql    dữ liệu mẫu (1 vùng đất, 10 từ, 3 hạt giống, 4 tài khoản thử)
 ├── pnpm-workspace.yaml   khai báo các gói trong monorepo
 ├── turbo.json            các tác vụ dev, build, lint, typecheck, test
 └── package.json          lệnh chạy chung ở thư mục gốc
@@ -32,16 +33,16 @@ language-world/
 
 ### Mỗi phần làm gì
 
-| Phần                | Tên gói        | Việc chính                                                                                                                                                               |
-| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `apps/web`          | `@lw/web`      | Trang `/` giới thiệu, `/play` chơi game (canvas toàn màn hình), store Zustand giữ số vàng, kết nối realtime, gọi `apps/api` qua `src/lib/api.ts`, manifest PWA.          |
-| `apps/admin`        | `@lw/admin`    | Thanh bên: Tổng quan, Từ vựng, Vật phẩm, Người chơi. Có `noindex` để Google không lập chỉ mục. `src/proxy.ts` là nơi sẽ kiểm tra quyền admin.                            |
-| `apps/api`          | `@lw/api`      | Backend Hono: vàng, nông trại, mua bán, bài học, route quản trị. Kiểm tra token Supabase và dữ liệu gửi lên bằng Zod. Xem [apps/api/README.md](apps/api/README.md).      |
-| `apps/realtime`     | `@lw/realtime` | Máy chủ Colyseus, phòng `region` tối đa 30 người, đồng bộ vị trí `x, z` và chat bằng câu có sẵn.                                                                         |
-| `packages/game`     | `@lw/game`     | `startGame(canvas, options)` trả về `{ dispose, setRemotePlayers }`. Lưới đất 6x6, camera xoay/kéo/phóng bằng chuột và cảm ứng.                                          |
-| `packages/shared`   | `@lw/shared`   | Nguồn dữ liệu gốc dùng chung: kiểu, `SEEDS`, phần thưởng, `REGION_ROOM`, `CHAT_PHRASES`, 10 từ vựng. `@lw/shared/api`: schema Zod và kiểu cho từng route của `apps/api`. |
-| `packages/ui`       | `@lw/ui`       | `Button`, `Panel` viết bằng Tailwind.                                                                                                                                    |
-| `packages/tsconfig` | `@lw/tsconfig` | `base.json`, `nextjs.json`, `react-library.json`, `browser-library.json`, `node.json`.                                                                                   |
+| Phần                | Tên gói        | Việc chính                                                                                                                                                                                                                                                                                                                            |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`          | `@lw/web`      | Trang `/` giới thiệu, `/play` chơi game (canvas toàn màn hình), store Zustand giữ số vàng, kết nối realtime, gọi `apps/api` qua `src/lib/api.ts`, manifest PWA.                                                                                                                                                                       |
+| `apps/admin`        | `@lw/admin`    | Đăng ký (`/signup`, tài khoản mới là `player`, chờ admin cấp quyền ở trang Người chơi) và đăng nhập Supabase + bắt buộc TOTP cho admin/editor/moderator, chặn người chơi. Menu theo vai trò (`ADMIN_SECTIONS` trong `@lw/shared`), `requireRole` trong `src/lib/auth.ts`, nhật ký `logAction` trong `src/lib/audit.ts`. Có `noindex`. |
+| `apps/api`          | `@lw/api`      | Backend Hono: vàng, nông trại, mua bán, bài học, route quản trị. Kiểm tra token Supabase và dữ liệu gửi lên bằng Zod. Xem [apps/api/README.md](apps/api/README.md).                                                                                                                                                                   |
+| `apps/realtime`     | `@lw/realtime` | Máy chủ Colyseus, phòng `region` tối đa 30 người, đồng bộ vị trí `x, z` và chat bằng câu có sẵn.                                                                                                                                                                                                                                      |
+| `packages/game`     | `@lw/game`     | `startGame(canvas, options)` trả về `{ dispose, setRemotePlayers }`. Lưới đất 6x6, camera xoay/kéo/phóng bằng chuột và cảm ứng.                                                                                                                                                                                                       |
+| `packages/shared`   | `@lw/shared`   | Nguồn dữ liệu gốc dùng chung: kiểu, `SEEDS`, phần thưởng, `REGION_ROOM`, `CHAT_PHRASES`, 10 từ vựng. `@lw/shared/api`: schema Zod và kiểu cho từng route của `apps/api`.                                                                                                                                                              |
+| `packages/ui`       | `@lw/ui`       | `Button`, `Panel` viết bằng Tailwind.                                                                                                                                                                                                                                                                                                 |
+| `packages/tsconfig` | `@lw/tsconfig` | `base.json`, `nextjs.json`, `react-library.json`, `browser-library.json`, `node.json`.                                                                                                                                                                                                                                                |
 
 Các gói trong `packages/` xuất thẳng mã TypeScript, không cần build riêng. Next.js tự biên dịch
 chúng (khai báo trong `transpilePackages`), còn máy chủ realtime và `apps/api` dùng `tsx` khi dev và `esbuild` khi build.
@@ -77,7 +78,7 @@ Chạy ở thư mục gốc:
 | `pnpm build`     | Build tất cả                                                           |
 | `pnpm lint`      | Kiểm tra code bằng ESLint                                              |
 | `pnpm typecheck` | Kiểm tra kiểu TypeScript ở mọi gói                                     |
-| `pnpm test`      | Chạy test (hiện có ở `apps/api`, dùng Vitest)                          |
+| `pnpm test`      | Chạy test Vitest (`apps/api`, `apps/admin`)                            |
 | `pnpm format`    | Định dạng lại code bằng Prettier                                       |
 
 Chạy riêng từng app bằng `--filter`:
@@ -99,7 +100,9 @@ pnpm --filter @lw/realtime dev   # ws://localhost:2567 (tự khởi động lạ
 4. Tắt máy chủ realtime rồi tải lại trang: game vẫn chạy, góc màn hình hiện `Offline`.
 5. Góc phải hiện thêm `API: OK`. Tắt `apps/api` thì sau tối đa 15 giây thành `API: Offline`, game vẫn chạy.
    http://localhost:4000/health trả về `{"ok":true,"service":"api","time":"..."}`.
-6. http://localhost:3001/words hiện bảng 10 từ, `/items` hiện 3 hạt giống.
+6. Trang admin (cần Supabase local, xem bên dưới): http://localhost:3001 chuyển về `/login`. Đăng nhập bằng
+   `admin@lw.test` / `matkhau123` (tương tự `editor@`, `moderator@`, `player@`), lần đầu quét mã QR bằng ứng dụng
+   xác thực. Menu chỉ hiện các trang vai trò đó được vào; `player@lw.test` bị chặn ở trang đăng nhập.
 
 ### Supabase
 
@@ -109,6 +112,7 @@ Supabase CLI được cài sẵn trong dự án, gọi qua `pnpm supabase ...`:
 pnpm supabase migration new ten_migration   # tạo file SQL mới trong supabase/migrations
 pnpm supabase start                         # chạy Supabase trên máy (cần Docker Desktop)
 pnpm supabase db reset                      # tạo lại database từ migrations + seed.sql
+pnpm supabase test db                       # chạy test SQL trong supabase/tests (RLS, admin_logs)
 ```
 
 ## Bốn quy tắc bắt buộc

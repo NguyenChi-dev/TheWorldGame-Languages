@@ -8,6 +8,7 @@
  * Nhập từ "@lw/shared/api" (không phải "@lw/shared") để các gói khác không phải kéo theo Zod.
  */
 import { z } from "zod";
+import { STAFF_ROLES } from "./roles";
 import { SEEDS, type SeedId } from "./seeds";
 
 // -----------------------------------------------------------------------------
@@ -139,6 +140,17 @@ export const LessonSubmitResponse = z.object({
   gold: z.int().min(0),
 });
 export type LessonSubmitResponse = z.infer<typeof LessonSubmitResponse>;
+
+// -----------------------------------------------------------------------------
+// Quản trị: GET /admin/me
+// -----------------------------------------------------------------------------
+
+export const AdminMeResponse = z.object({
+  id: z.string(),
+  email: z.string().nullable(),
+  role: z.enum(STAFF_ROLES),
+});
+export type AdminMeResponse = z.infer<typeof AdminMeResponse>;
 
 // -----------------------------------------------------------------------------
 // Quản trị: GET /admin/stats

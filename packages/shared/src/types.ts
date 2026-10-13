@@ -2,6 +2,7 @@
  * Kiểu dữ liệu dùng chung cho web, admin, game và máy chủ realtime.
  * Tên trường dùng camelCase; khi đọc từ Supabase (snake_case) cần chuyển đổi.
  */
+import type { Role } from "./roles";
 
 /** Mã ngôn ngữ của một vùng đất, ví dụ "en" là tiếng Anh. */
 export type LanguageCode = "en";
@@ -9,15 +10,12 @@ export type LanguageCode = "en";
 /** Cấp độ từ vựng: 1 là dễ nhất. */
 export type WordLevel = 1 | 2 | 3;
 
-/** Vai trò trong bảng profiles.role. Chỉ máy chủ được đổi. */
-export type PlayerRole = "player" | "admin";
-
-/** Tài khoản người chơi (bảng profiles). */
+/** Tài khoản người chơi (bảng profiles). role: chỉ admin (đã qua 2 lớp) hoặc máy chủ được đổi. */
 export interface Player {
   id: string;
   username: string;
   gold: number;
-  role: PlayerRole;
+  role: Role;
   createdAt: string;
 }
 

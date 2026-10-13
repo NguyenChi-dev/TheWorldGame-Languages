@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import { ENGLISH_VEGETABLES } from "@lw/shared";
+import { ADMIN_SECTIONS, ENGLISH_VEGETABLES } from "@lw/shared";
 import { Panel } from "@lw/ui";
 import { PageTitle } from "@/components/page-title";
+import { requireSection } from "@/lib/auth";
 
-export const metadata: Metadata = { title: "Từ vựng" };
+export const metadata: Metadata = { title: ADMIN_SECTIONS.words.label };
 
-export default function WordsPage() {
+export default async function WordsPage() {
+  await requireSection("words");
+
   return (
     <>
-      <PageTitle>Từ vựng</PageTitle>
+      <PageTitle>{ADMIN_SECTIONS.words.label}</PageTitle>
       <Panel title={`Tiếng Anh: rau củ (${ENGLISH_VEGETABLES.length} từ)`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

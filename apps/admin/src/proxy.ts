@@ -1,18 +1,59 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Proxy chạy TRƯỚC mọi trang admin. (Từ Next.js 16, file "middleware.ts" đã đổi tên thành
  * "proxy.ts" và hàm "middleware" đổi thành "proxy"; chức năng giữ nguyên.)
  *
- * Đây là nơi SẼ kiểm tra đăng nhập và vai trò admin ở giai đoạn sau:
- *   1. Tạo Supabase server client từ cookie của request.
- *   2. Gọi supabase.auth.getClaims() để lấy người dùng đã xác thực.
- *   3. Nếu chưa đăng nhập hoặc không có vai trò admin: chuyển hướng tới trang đăng nhập.
+ * Việc của proxy:
+ *   1. Làm mới phiên đăng nhập Supabase (ghi lại cookie khi token sắp hết hạn).
+ *   2. Chưa đăng nhập thì chuyển về /login (kiểm tra "lạc quan", chỉ để chuyển hướng nhanh).
  *
- * Hiện tại CHƯA chặn gì, mọi request đều đi tiếp.
+ * Proxy KHÔNG phải lớp bảo mật chính: vai trò và xác thực hai lớp được kiểm tra trong
+ * src/lib/auth.ts (mọi trang, mọi server action) và trong RLS của database.
  */
-export function proxy(request: NextRequest) {
-  return NextResponse.next({ request });
+/** Trang mở được khi chưa đăng nhập: đăng nhập, đăng ký, link xác nhận email. */
+const PUBLIC_PATHS = ["/login", "/signup", "/auth/callback"];
+
+function isPublicPath(pathname: string) {
+  return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+export async function proxy(request: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  // Chưa cấu hình Supabase: để trang tự báo lỗi, không chặn ở đây.
+  if (!url || !key) return NextResponse.next({ request });
+
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet, headers) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        Object.entries(headers).forEach(([name, value]) => response.headers.set(name, value));
+      },
+    },
+  });
+
+  // Không chèn code nào giữa createServerClient và getClaims (theo hướng dẫn của Supabase).
+  const { data } = await supabase.auth.getClaims().catch(() => ({ data: null }));
+
+  if (!data?.claims && !isPublicPath(request.nextUrl.pathname)) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+    const redirect = NextResponse.redirect(loginUrl);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
+  }
+
+  return response;
 }
 
 export const config = {
