@@ -18,15 +18,15 @@ update public.profiles set role = 'editor'    where id = 'f0000000-0000-4000-800
 update public.profiles set role = 'moderator' where id = 'f0000000-0000-4000-8000-000000000002';
 
 -- Dữ liệu riêng cho test: 1 vùng đang mở, 1 vùng tắt, từ của mỗi vùng.
-insert into public.lands (id, name, language_code, is_active) values
-  ('t1', 'Vùng thử', 'tt', true),
-  ('t2', 'Vùng tắt', 'tu', false);
+insert into public.lands (id, slug, name, language_code, is_active) values
+  ('f1a70000-0000-4000-8000-000000000001', 'vung-thu', 'Vùng thử', 'tt', true),
+  ('f1a70000-0000-4000-8000-000000000002', 'vung-tat', 'Vùng tắt', 'tu', false);
 insert into public.words (id, land_id, word, meaning) values
-  ('t1-apple', 't1', 'apple', 'táo'),
-  ('t2-pear',  't2', 'pear',  'lê');
-insert into public.areas (id, land_id, name, scene, skill, is_active) values
-  ('fa000000-0000-4000-8000-000000000001', 't1', 'Khu đang mở', 'farm', 'vocabulary', true),
-  ('fa000000-0000-4000-8000-000000000002', 't1', 'Khu tắt',     'park', 'group_talk', false);
+  ('t1-apple', 'f1a70000-0000-4000-8000-000000000001', 'apple', 'táo'),
+  ('t2-pear',  'f1a70000-0000-4000-8000-000000000002', 'pear',  'lê');
+insert into public.areas (id, land_id, name, scene, skill, unlock_order, is_active) values
+  ('fa000000-0000-4000-8000-000000000001', 'f1a70000-0000-4000-8000-000000000001', 'Khu đang mở', 'farm', 'vocabulary', 1, true),
+  ('fa000000-0000-4000-8000-000000000002', 'f1a70000-0000-4000-8000-000000000001', 'Khu tắt',     'park', 'group_talk', 2, false);
 insert into public.lessons (id, area_id, title, status) values
   ('fb000000-0000-4000-8000-000000000001', 'fa000000-0000-4000-8000-000000000001', 'Bài đã xuất bản', 'published'),
   ('fb000000-0000-4000-8000-000000000002', 'fa000000-0000-4000-8000-000000000001', 'Bài nháp',        'draft');
@@ -46,8 +46,8 @@ select throws_ok(
 
 -- ---------------------------------------------------------------- khách (anon)
 set local role anon;
-select is((select count(*)::int from public.lands where id in ('t1', 't2')), 1, 'khách chỉ thấy vùng đang mở');
-select is((select count(*)::int from public.areas where land_id = 't1'), 1, 'khách chỉ thấy khu vực đang mở');
+select is((select count(*)::int from public.lands where id in ('f1a70000-0000-4000-8000-000000000001', 'f1a70000-0000-4000-8000-000000000002')), 1, 'khách chỉ thấy vùng đang mở');
+select is((select count(*)::int from public.areas where land_id = 'f1a70000-0000-4000-8000-000000000001'), 1, 'khách chỉ thấy khu vực đang mở');
 select is((select count(*)::int from public.lessons where area_id = 'fa000000-0000-4000-8000-000000000001'), 1,
   'khách chỉ thấy bài đã xuất bản');
 reset role;
@@ -59,7 +59,7 @@ set local role authenticated;
 select is((select count(*)::int from public.lessons where area_id = 'fa000000-0000-4000-8000-000000000001'), 1,
   'người chơi không thấy bài nháp');
 select throws_ok(
-  $$ insert into public.areas (land_id, name, scene, skill) values ('t1', 'Khu lạ', 'cafe', 'reading') $$,
+  $$ insert into public.areas (land_id, name, scene, skill) values ('f1a70000-0000-4000-8000-000000000001', 'Khu lạ', 'cafe', 'reading') $$,
   '42501', null, 'người chơi không thêm được khu vực');
 reset role;
 
@@ -77,7 +77,7 @@ select set_config('request.jwt.claims',
   '{"sub":"f0000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}', true);
 set local role authenticated;
 select throws_ok(
-  $$ insert into public.areas (land_id, name, scene, skill) values ('t1', 'Khu aal1', 'cafe', 'reading') $$,
+  $$ insert into public.areas (land_id, name, scene, skill) values ('f1a70000-0000-4000-8000-000000000001', 'Khu aal1', 'cafe', 'reading') $$,
   '42501', null, 'editor chưa qua 2 lớp không thêm được khu vực');
 reset role;
 
@@ -87,9 +87,9 @@ select set_config('request.jwt.claims',
 set local role authenticated;
 select is((select count(*)::int from public.lessons where area_id = 'fa000000-0000-4000-8000-000000000001'), 2,
   'editor thấy cả bài nháp');
-select is((select count(*)::int from public.lands where id in ('t1', 't2')), 2, 'editor thấy cả vùng đang tắt');
+select is((select count(*)::int from public.lands where id in ('f1a70000-0000-4000-8000-000000000001', 'f1a70000-0000-4000-8000-000000000002')), 2, 'editor thấy cả vùng đang tắt');
 select lives_ok(
-  $$ insert into public.areas (land_id, name, scene, skill) values ('t1', 'Quán cà phê', 'cafe', 'conversation') $$,
+  $$ insert into public.areas (land_id, name, scene, skill, unlock_order) values ('f1a70000-0000-4000-8000-000000000001', 'Quán cà phê', 'cafe', 'conversation', 3) $$,
   'editor thêm được khu vực');
 select lives_ok(
   $$ update public.lessons set status = 'published' where id = 'fb000000-0000-4000-8000-000000000002' $$,

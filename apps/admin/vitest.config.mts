@@ -11,6 +11,9 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_SUPABASE_URL: "",
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
+      // Cloudinary GIẢ: test không bao giờ gọi vào tài khoản thật.
+      CLOUDINARY_URL: "cloudinary://123456789:test-secret-khong-that@test-cloud",
+      CLOUDINARY_FOLDER: "",
     },
   },
 });

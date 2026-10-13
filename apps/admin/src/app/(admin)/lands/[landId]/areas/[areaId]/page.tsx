@@ -7,8 +7,9 @@ import { Card } from "@/components/card";
 import { PageTitle } from "@/components/page-title";
 import { Tabs } from "@/components/tabs";
 import { requireSection } from "@/lib/auth";
-import { embeddedCount, getArea, getLand, toLesson } from "@/lib/content";
+import { coverUrlOf, embeddedCount, getArea, getLand, toLesson } from "@/lib/content";
 import { createClient } from "@/lib/supabase/server";
+import { AreaForm } from "../../../_components/area-form";
 
 type Params = Promise<{ landId: string; areaId: string }>;
 type SearchParams = Promise<{ tab?: string }>;
@@ -32,7 +33,7 @@ interface AreaWord {
 }
 
 /**
- * /lands/[landId]/areas/[areaId]: khu vực với 3 tab Thông tin · Bài học · Từ vựng.
+ * /lands/[landId]/areas/[areaId]: khu vực với 3 tab Thông tin (sửa khu vực) · Bài học · Từ vựng.
  * Tab Từ vựng chỉ có các từ mà bài học của khu vực này dùng; kho đầy đủ ở /words.
  */
 export default async function AreaPage({
@@ -49,6 +50,12 @@ export default async function AreaPage({
   const base = `/lands/${land.id}/areas/${area.id}`;
 
   const supabase = await createClient();
+  const { data: coverRow } = await supabase
+    .from("areas")
+    .select("cover:media(secure_url)")
+    .eq("id", area.id)
+    .maybeSingle();
+  const areaCover = coverRow ? coverUrlOf(coverRow) : null;
   const { data: lessonRows, error: lessonError } = await supabase
     .from("lessons")
     .select("*, lesson_words(count)")
@@ -107,30 +114,28 @@ export default async function AreaPage({
       />
 
       {tab === "info" ? (
-        <Card title="Thông tin khu vực">
-          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-            <div className="flex justify-between gap-3">
-              <dt className="text-slate-500">Kỹ năng</dt>
-              <dd>
-                <Badge>{SKILL_LABELS[area.skill]}</Badge>
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-slate-500">Mẫu cảnh 3D</dt>
-              <dd className="font-medium">{AREA_SCENE_LABELS[area.scene]}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-slate-500">Thứ tự mở khóa</dt>
-              <dd className="font-medium">{area.unlockOrder}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-slate-500">Trạng thái</dt>
-              <dd>
-                <ActiveBadge active={area.isActive} />
-              </dd>
-            </div>
-          </dl>
-        </Card>
+        <div className="grid gap-4 lg:grid-cols-[1fr_16rem]">
+          <Card title="Sửa khu vực">
+            <AreaForm landId={land.id} area={area} coverUrl={areaCover} lessonCount={lessons.length} />
+          </Card>
+          <Card title="Trạng thái">
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-500">Đang bật</dt>
+                <dd>
+                  <ActiveBadge active={area.isActive} />
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-500">Thứ tự mở khóa</dt>
+                <dd className="font-medium">{area.unlockOrder + 1}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-slate-500">
+              Bật/tắt và đổi thứ tự ở danh sách khu vực của vùng đất {land.name}.
+            </p>
+          </Card>
+        </div>
       ) : null}
 
       {tab === "lessons" ? (

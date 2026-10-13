@@ -5,8 +5,8 @@
 import type { Role } from "./roles";
 import type { AreaScene, LessonStatus, Skill } from "./world";
 
-/** Mã ngôn ngữ của một vùng đất, ví dụ "en" là tiếng Anh. */
-export type LanguageCode = "en";
+/** Mã ngôn ngữ 2–3 chữ thường của một vùng đất, ví dụ "en" (tiếng Anh), "ja" (tiếng Nhật). */
+export type LanguageCode = string;
 
 /** Cấp độ từ vựng: 1 là dễ nhất. */
 export type WordLevel = 1 | 2 | 3;
@@ -30,17 +30,25 @@ export interface Character {
   createdAt: string;
 }
 
-/** Vùng đất = một ngôn ngữ (bảng lands). Cấp lớn nhất của thế giới game. */
+/**
+ * Vùng đất = một ngôn ngữ (bảng lands). Cấp lớn nhất của thế giới game.
+ * KHÔNG có điều kiện mở khóa: vùng đang bật (isActive) thì người chơi vào được ngay.
+ */
 export interface Land {
   id: string;
+  /** Định danh dễ đọc trong URL/code, chỉ a-z, 0-9 và dấu gạch ngang, ví dụ "tieng-anh". */
+  slug: string;
   name: string;
   languageCode: LanguageCode;
   description: string;
   coverMediaId: string | null;
-  /** Thứ tự mở khóa, nhỏ mở trước. */
-  unlockOrder: number;
+  /** Thứ tự hiển thị, nhỏ đứng trước. */
+  sortOrder: number;
   isActive: boolean;
 }
+
+/** Điều kiện mở khóa khu vực, dạng JSON tự do, ví dụ { "lessons_done": 3 }. */
+export type UnlockRequirement = Record<string, unknown>;
 
 /** Khu vực = một địa điểm trong vùng đất, luyện MỘT kỹ năng (bảng areas). */
 export interface Area {
@@ -49,7 +57,10 @@ export interface Area {
   name: string;
   scene: AreaScene;
   skill: Skill;
+  coverMediaId: string | null;
+  /** Thứ tự mở khóa trong vùng đất, nhỏ mở trước. */
   unlockOrder: number;
+  unlockRequirement: UnlockRequirement;
   isActive: boolean;
 }
 

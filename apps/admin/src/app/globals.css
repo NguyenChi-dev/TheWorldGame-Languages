@@ -189,6 +189,18 @@
   color-scheme: light;
 }
 
+/*
+ * Chủ đề cho component dùng chung trong packages/ui (Button, Switch...).
+ * Để RIÊNG một luật: nếu chung luật với color-scheme, bước tối ưu CSS của Next (LightningCSS)
+ * viết lại luật đó và làm mất các biến này.
+ */
+html {
+  --ui-accent: var(--color-accent);
+  --ui-accent-hover: var(--color-accent-deep);
+  --ui-accent-strong: var(--color-accent);
+  --ui-accent-soft: var(--color-secondary);
+}
+
 body {
   @apply bg-slate-100 text-slate-900 antialiased;
 }

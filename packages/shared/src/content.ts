@@ -1,8 +1,9 @@
 import type { Word, WordLevel } from "./types";
 import vegetablesJson from "./content/en/vegetables.json";
 
-/** Vùng đất tiếng Anh. supabase/seed.sql dùng cùng id này. */
-export const ENGLISH_LAND_ID = "en";
+/** Vùng đất tiếng Anh. supabase/seed.sql và migration *_vung_dat.sql dùng cùng UUID này. */
+export const ENGLISH_LAND_ID = "a17d0000-0000-4000-8000-000000000001";
+export const ENGLISH_LAND_SLUG = "tieng-anh";
 
 interface RawWord {
   id: string;

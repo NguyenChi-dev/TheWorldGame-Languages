@@ -3,20 +3,23 @@
 --   - Từ vựng: packages/shared/src/content/en/vegetables.json
 --   - Hạt giống: packages/shared/src/seeds.ts
 
-insert into public.lands (id, name, language_code, description) values
-  ('en', 'Tiếng Anh', 'en', 'Thế giới tiếng Anh: nông trại, rạp chiếu phim, công viên và thị trấn nhỏ.');
+-- Vùng đất: id UUID cố định để code (ENGLISH_LAND_ID trong @lw/shared) và dữ liệu khớp nhau.
+-- Khu vực, bài học mẫu nằm ở supabase/seeds/vung_dat.sql.
+insert into public.lands (id, slug, language_code, name, description, sort_order, is_active) values
+  ('a17d0000-0000-4000-8000-000000000001', 'tieng-anh', 'en', 'Tiếng Anh',
+   'Thế giới tiếng Anh: nông trại, rạp chiếu phim, công viên và thị trấn nhỏ.', 0, true);
 
 insert into public.words (id, land_id, word, meaning, level, topic) values
-  ('en-carrot',   'en', 'carrot',   'cà rốt',      1, 'vegetables'),
-  ('en-tomato',   'en', 'tomato',   'cà chua',     1, 'vegetables'),
-  ('en-corn',     'en', 'corn',     'ngô',         1, 'vegetables'),
-  ('en-potato',   'en', 'potato',   'khoai tây',   1, 'vegetables'),
-  ('en-onion',    'en', 'onion',    'hành tây',    1, 'vegetables'),
-  ('en-cabbage',  'en', 'cabbage',  'bắp cải',     2, 'vegetables'),
-  ('en-cucumber', 'en', 'cucumber', 'dưa chuột',   2, 'vegetables'),
-  ('en-pumpkin',  'en', 'pumpkin',  'bí ngô',      2, 'vegetables'),
-  ('en-lettuce',  'en', 'lettuce',  'rau xà lách', 3, 'vegetables'),
-  ('en-eggplant', 'en', 'eggplant', 'cà tím',      3, 'vegetables');
+  ('en-carrot',   'a17d0000-0000-4000-8000-000000000001', 'carrot',   'cà rốt',      1, 'vegetables'),
+  ('en-tomato',   'a17d0000-0000-4000-8000-000000000001', 'tomato',   'cà chua',     1, 'vegetables'),
+  ('en-corn',     'a17d0000-0000-4000-8000-000000000001', 'corn',     'ngô',         1, 'vegetables'),
+  ('en-potato',   'a17d0000-0000-4000-8000-000000000001', 'potato',   'khoai tây',   1, 'vegetables'),
+  ('en-onion',    'a17d0000-0000-4000-8000-000000000001', 'onion',    'hành tây',    1, 'vegetables'),
+  ('en-cabbage',  'a17d0000-0000-4000-8000-000000000001', 'cabbage',  'bắp cải',     2, 'vegetables'),
+  ('en-cucumber', 'a17d0000-0000-4000-8000-000000000001', 'cucumber', 'dưa chuột',   2, 'vegetables'),
+  ('en-pumpkin',  'a17d0000-0000-4000-8000-000000000001', 'pumpkin',  'bí ngô',      2, 'vegetables'),
+  ('en-lettuce',  'a17d0000-0000-4000-8000-000000000001', 'lettuce',  'rau xà lách', 3, 'vegetables'),
+  ('en-eggplant', 'a17d0000-0000-4000-8000-000000000001', 'eggplant', 'cà tím',      3, 'vegetables');
 
 insert into public.items (id, kind, name, buy_price, sell_price, grow_seconds, word_id) values
   ('carrot', 'seed', 'Carrot seed', 10, 18,  60, 'en-carrot'),

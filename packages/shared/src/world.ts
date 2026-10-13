@@ -51,7 +51,7 @@ export type AreaScene = (typeof AREA_SCENES)[number];
 
 export const AREA_SCENE_LABELS: Record<AreaScene, string> = {
   farm: "Nông trại",
-  market: "Siêu thị / Chợ",
+  market: "Chợ / siêu thị",
   cinema: "Rạp chiếu phim",
   cafe: "Quán cà phê",
   library: "Thư viện",

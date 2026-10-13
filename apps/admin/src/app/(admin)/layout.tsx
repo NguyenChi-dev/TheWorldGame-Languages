@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { ROLE_LABELS, sectionsForRole } from "@lw/shared";
+import { ToastProvider } from "@lw/ui";
 import { Sidebar } from "@/components/sidebar";
 import { SIDEBAR_COOKIE } from "@/components/sidebar-cookie";
 import { requireSection } from "@/lib/auth";
@@ -28,7 +29,10 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
         defaultCollapsed={collapsed}
       />
       <main className="min-w-0 flex-1 p-4 md:p-6">
-        <div className="mx-auto max-w-6xl">{children}</div>
+        {/* ToastProvider: thông báo thành công / lỗi (toast) cho mọi trang quản trị. */}
+        <ToastProvider>
+          <div className="mx-auto max-w-6xl">{children}</div>
+        </ToastProvider>
       </main>
     </div>
   );
