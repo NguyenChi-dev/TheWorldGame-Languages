@@ -107,3 +107,63 @@ export const PhoneIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M11 18.5h2" />
   </Icon>
 );
+
+// --- Icon cho các mục menu trang quản trị ---
+
+export const HomeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="M3.5 11 12 4l8.5 7" />
+    <path d="M5.5 9.5V20h5v-5.5h3V20h5V9.5" />
+  </Icon>
+);
+
+export const MapIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20V6.5Z" />
+    <path d="M9 4v13.5M15 6.5V20" />
+  </Icon>
+);
+
+export const BookIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z" />
+    <path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5M8.5 8h7M8.5 11.5h5" />
+  </Icon>
+);
+
+export const CapIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="m2.5 9 9.5-4.5L21.5 9 12 13.5 2.5 9Z" />
+    <path d="M6.5 11v5c1.5 1.6 3.4 2.5 5.5 2.5s4-.9 5.5-2.5v-5M21.5 9v5" />
+  </Icon>
+);
+
+export const ImageIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="2.5" />
+    <circle cx="9" cy="9.5" r="1.8" />
+    <path d="m4 18 5.5-5.5 4 4 2.5-2.5 4.5 4.5" />
+  </Icon>
+);
+
+export const CoinIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <ellipse cx="12" cy="7" rx="7.5" ry="3" />
+    <path d="M4.5 7v5c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V7M4.5 12v5c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-5" />
+  </Icon>
+);
+
+export const LogOutIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
+    <path d="M10 16.5 5.5 12 10 7.5M5.5 12H15" />
+  </Icon>
+);
+
+/** Biểu tượng thu gọn thanh bên (khung có cột trái + mũi tên); xoay 180° để thành "mở rộng". */
+export const SidebarToggleIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="2.5" />
+    <path d="M9 4v16M15.5 9.5 13 12l2.5 2.5" />
+  </Icon>
+);

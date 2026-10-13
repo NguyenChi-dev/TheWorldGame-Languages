@@ -29,28 +29,53 @@ export function isStaffRole(role: Role | null | undefined): role is StaffRole {
   return role != null && (STAFF_ROLES as readonly string[]).includes(role);
 }
 
+/** Nhóm trên thanh bên. Tổng quan không thuộc nhóm nào. */
+export const ADMIN_SECTION_GROUPS = {
+  content: "Nội dung học",
+  economy: "Kinh tế",
+  operations: "Vận hành",
+} as const;
+export type AdminSectionGroup = keyof typeof ADMIN_SECTION_GROUPS;
+
 export interface AdminSection {
   key: string;
   href: string;
   label: string;
+  group: AdminSectionGroup | null;
   roles: readonly StaffRole[];
 }
 
-/** Bảng phân quyền: mỗi mục menu / trang của apps/admin và các vai trò được vào. */
+/**
+ * Bảng phân quyền: mỗi mục menu / trang của apps/admin và các vai trò được vào.
+ * Thứ tự ở đây là thứ tự trên thanh bên. Route con dùng chung quyền của mục cha,
+ * ví dụ /lands/[landId]/areas/... (khu vực, bài học) dùng quyền của "lands".
+ */
 export const ADMIN_SECTIONS = {
-  overview: { key: "overview", href: "/", label: "Tổng quan", roles: ["admin", "editor", "moderator"] },
-  lands: { key: "lands", href: "/lands", label: "Vùng đất và cửa hàng", roles: ["admin", "editor"] },
-  words: { key: "words", href: "/words", label: "Từ vựng", roles: ["admin", "editor"] },
-  lessons: { key: "lessons", href: "/lessons", label: "Bài học", roles: ["admin", "editor"] },
-  media: { key: "media", href: "/media", label: "Media", roles: ["admin", "editor"] },
-  economy: { key: "economy", href: "/economy", label: "Vật phẩm và kinh tế", roles: ["admin"] },
+  overview: {
+    key: "overview",
+    href: "/",
+    label: "Tổng quan",
+    group: null,
+    roles: ["admin", "editor", "moderator"],
+  },
+  lands: { key: "lands", href: "/lands", label: "Vùng đất", group: "content", roles: ["admin", "editor"] },
+  words: { key: "words", href: "/words", label: "Kho từ vựng", group: "content", roles: ["admin", "editor"] },
+  media: { key: "media", href: "/media", label: "Media", group: "content", roles: ["admin", "editor"] },
+  economy: {
+    key: "economy",
+    href: "/economy",
+    label: "Vật phẩm và kinh tế",
+    group: "economy",
+    roles: ["admin"],
+  },
   players: {
     key: "players",
     href: "/players",
     label: "Người chơi và báo cáo",
+    group: "operations",
     roles: ["admin", "moderator"],
   },
-  logs: { key: "logs", href: "/logs", label: "Nhật ký", roles: ["admin"] },
+  logs: { key: "logs", href: "/logs", label: "Nhật ký", group: "operations", roles: ["admin"] },
 } as const satisfies Record<string, AdminSection>;
 
 export type AdminSectionKey = keyof typeof ADMIN_SECTIONS;
@@ -64,6 +89,6 @@ export function canAccessSection(role: Role | null | undefined, key: AdminSectio
 }
 
 /** Các mục menu mà vai trò này được thấy, theo đúng thứ tự trong bảng. */
-export function sectionsForRole(role: Role | null | undefined): AdminSection[] {
+export function sectionsForRole(role: Role | null | undefined): (typeof ADMIN_SECTIONS)[AdminSectionKey][] {
   return Object.values(ADMIN_SECTIONS).filter((section) => sectionAllows(section, role));
 }

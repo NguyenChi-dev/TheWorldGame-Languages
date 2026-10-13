@@ -110,12 +110,24 @@ describe("requireSection", () => {
 
 describe("bảng phân quyền menu", () => {
   it.each<[Role, string[]]>([
-    ["admin", ["/", "/lands", "/words", "/lessons", "/media", "/economy", "/players", "/logs"]],
-    ["editor", ["/", "/lands", "/words", "/lessons", "/media"]],
+    ["admin", ["/", "/lands", "/words", "/media", "/economy", "/players", "/logs"]],
+    ["editor", ["/", "/lands", "/words", "/media"]],
     ["moderator", ["/", "/players"]],
     ["player", []],
   ])("%s thấy đúng các trang", (role, hrefs) => {
     expect(sectionsForRole(role).map((section) => section.href)).toEqual(hrefs);
+  });
+
+  it("thanh bên chia nhóm Nội dung học · Kinh tế · Vận hành, không còn mục Bài học riêng", () => {
+    expect(sectionsForRole("admin").map((section) => [section.label, section.group])).toEqual([
+      ["Tổng quan", null],
+      ["Vùng đất", "content"],
+      ["Kho từ vựng", "content"],
+      ["Media", "content"],
+      ["Vật phẩm và kinh tế", "economy"],
+      ["Người chơi và báo cáo", "operations"],
+      ["Nhật ký", "operations"],
+    ]);
   });
 });
 

@@ -4,6 +4,9 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(19);
 
+-- Test không phụ thuộc công tắc 2 lớp đang bật hay tắt trên database đang chạy (rollback cuối test).
+update public.admin_settings set require_mfa = true;
+
 insert into auth.users (id, email) values
   ('c0000000-0000-4000-8000-000000000001', 'role-admin@lw.test'),
   ('c0000000-0000-4000-8000-000000000002', 'role-editor@lw.test'),

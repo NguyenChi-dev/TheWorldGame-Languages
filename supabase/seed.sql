@@ -4,7 +4,7 @@
 --   - Hạt giống: packages/shared/src/seeds.ts
 
 insert into public.lands (id, name, language_code, description) values
-  ('en', 'English Island', 'en', 'Vùng đất tiếng Anh: nông trại và thị trấn nhỏ.');
+  ('en', 'Tiếng Anh', 'en', 'Thế giới tiếng Anh: nông trại, rạp chiếu phim, công viên và thị trấn nhỏ.');
 
 insert into public.words (id, land_id, word, meaning, level, topic) values
   ('en-carrot',   'en', 'carrot',   'cà rốt',      1, 'vegetables'),

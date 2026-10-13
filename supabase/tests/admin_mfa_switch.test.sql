@@ -4,12 +4,15 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(7);
 
+-- Bắt đầu từ trạng thái mặc định (BẬT), bất kể database đang chạy bật hay tắt. Tất cả bị rollback cuối test.
+update public.admin_settings set require_mfa = true;
+
 insert into auth.users (id, email) values
   ('e0000000-0000-4000-8000-000000000001', 'mfa-admin@lw.test'),
   ('e0000000-0000-4000-8000-000000000002', 'mfa-player@lw.test');
 update public.profiles set role = 'admin' where id = 'e0000000-0000-4000-8000-000000000001';
 
-select is(public.admin_mfa_required(), true, 'mặc định bắt buộc xác thực hai lớp');
+select is(public.admin_mfa_required(), true, 'công tắc bật: bắt buộc xác thực hai lớp');
 
 -- ---------------------------------------------------------------- công tắc BẬT: admin aal1 bị chặn
 select set_config('request.jwt.claims',

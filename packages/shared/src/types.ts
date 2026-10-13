@@ -3,6 +3,7 @@
  * Tên trường dùng camelCase; khi đọc từ Supabase (snake_case) cần chuyển đổi.
  */
 import type { Role } from "./roles";
+import type { AreaScene, LessonStatus, Skill } from "./world";
 
 /** Mã ngôn ngữ của một vùng đất, ví dụ "en" là tiếng Anh. */
 export type LanguageCode = "en";
@@ -29,12 +30,36 @@ export interface Character {
   createdAt: string;
 }
 
-/** Vùng đất theo ngôn ngữ (bảng lands). */
+/** Vùng đất = một ngôn ngữ (bảng lands). Cấp lớn nhất của thế giới game. */
 export interface Land {
   id: string;
   name: string;
   languageCode: LanguageCode;
   description: string;
+  coverMediaId: string | null;
+  /** Thứ tự mở khóa, nhỏ mở trước. */
+  unlockOrder: number;
+  isActive: boolean;
+}
+
+/** Khu vực = một địa điểm trong vùng đất, luyện MỘT kỹ năng (bảng areas). */
+export interface Area {
+  id: string;
+  landId: string;
+  name: string;
+  scene: AreaScene;
+  skill: Skill;
+  unlockOrder: number;
+  isActive: boolean;
+}
+
+/** Bài học, nằm trong một khu vực (bảng lessons). Từ vựng dùng trong bài nằm ở bảng lesson_words. */
+export interface Lesson {
+  id: string;
+  areaId: string;
+  title: string;
+  status: LessonStatus;
+  position: number;
 }
 
 /** Một từ vựng (bảng words). */

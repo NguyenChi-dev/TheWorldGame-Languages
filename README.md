@@ -24,7 +24,8 @@ language-world/
 ├── supabase/
 │   ├── config.toml cấu hình Supabase CLI
 │   ├── migrations/ file SQL tạo bảng + bảo mật RLS
-│   ├── tests/      test SQL (pgTAP) cho RLS và admin_logs
+│   ├── tests/      test SQL (pgTAP) cho RLS, admin_logs, vùng đất/khu vực/bài học
+│   ├── seeds/      dữ liệu mẫu thêm (vùng Tiếng Anh: 3 khu vực, 3 bài nháp)
 │   └── seed.sql    dữ liệu mẫu (1 vùng đất, 10 từ, 3 hạt giống, 4 tài khoản thử)
 ├── pnpm-workspace.yaml   khai báo các gói trong monorepo
 ├── turbo.json            các tác vụ dev, build, lint, typecheck, test

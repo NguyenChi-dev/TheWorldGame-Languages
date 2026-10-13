@@ -2,7 +2,7 @@
 
 import { useActionState, useId, useState, useTransition } from "react";
 import { Alert, ShineButtonContent, SubmitButton } from "@/components/auth/form";
-import { ArrowRightIcon, CheckIcon, CopyIcon, PhoneIcon, ShieldIcon } from "@/components/auth/icons";
+import { ArrowRightIcon, CheckIcon, CopyIcon, PhoneIcon, ShieldIcon } from "@/components/icons";
 import { inputClass, primaryButtonClass } from "@/components/auth/styles";
 import type { ActionState } from "@/lib/action-state";
 import { startTotpEnroll, verifyTotp, type EnrollResult } from "../../actions";

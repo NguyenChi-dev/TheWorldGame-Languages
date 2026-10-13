@@ -1,4 +1,4 @@
-import { ShieldIcon } from "./icons";
+import { ShieldIcon } from "@/components/icons";
 
 /**
  * Nội dung cột form trong khung game ((auth)/layout.tsx): nhãn, tiêu đề, form và chân trang.

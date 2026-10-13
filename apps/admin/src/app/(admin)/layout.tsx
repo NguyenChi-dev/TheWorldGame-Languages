@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { ROLE_LABELS, sectionsForRole } from "@lw/shared";
 import { Sidebar } from "@/components/sidebar";
+import { SIDEBAR_COOKIE } from "@/components/sidebar-cookie";
 import { requireSection } from "@/lib/auth";
 
 /**
@@ -10,15 +12,24 @@ import { requireSection } from "@/lib/auth";
  */
 export default async function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const session = await requireSection("overview");
+  const collapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === "collapsed";
 
   return (
-    <div className="flex min-h-dvh flex-col md:flex-row">
+    <div className="min-h-dvh bg-background md:flex">
       <Sidebar
-        items={sectionsForRole(session.role).map(({ href, label }) => ({ href, label }))}
+        items={sectionsForRole(session.role).map(({ key, href, label, group }) => ({
+          key,
+          href,
+          label,
+          group,
+        }))}
         email={session.email}
         roleLabel={ROLE_LABELS[session.role]}
+        defaultCollapsed={collapsed}
       />
-      <main className="flex-1 p-6">{children}</main>
+      <main className="min-w-0 flex-1 p-4 md:p-6">
+        <div className="mx-auto max-w-6xl">{children}</div>
+      </main>
     </div>
   );
 }

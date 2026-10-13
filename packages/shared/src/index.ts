@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./roles";
+export * from "./world";
 export * from "./seeds";
 export * from "./rewards";
 export * from "./realtime";

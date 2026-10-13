@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Alert, PasswordField, SubmitButton, TextField } from "@/components/auth/form";
-import { ArrowRightIcon, LockIcon, MailIcon } from "@/components/auth/icons";
+import { ArrowRightIcon, LockIcon, MailIcon } from "@/components/icons";
 import type { ActionState } from "@/lib/action-state";
 import { signIn } from "../actions";
 

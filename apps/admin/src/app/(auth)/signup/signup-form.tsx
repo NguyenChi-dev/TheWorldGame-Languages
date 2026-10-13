@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Alert, PasswordField, PasswordStrength, SubmitButton, TextField } from "@/components/auth/form";
-import { ArrowRightIcon, LockIcon, MailIcon, UserIcon } from "@/components/auth/icons";
+import { ArrowRightIcon, LockIcon, MailIcon, UserIcon } from "@/components/icons";
 import { secondaryButtonClass } from "@/components/auth/styles";
 import type { ActionState } from "@/lib/action-state";
 import { signUp } from "../actions";

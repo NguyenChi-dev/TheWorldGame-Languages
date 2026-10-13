@@ -1,11 +1,7 @@
-import { Baloo_2 } from "next/font/google";
 import Image from "next/image";
 import logo from "@lw/assets/Logo.png";
-import { ClipboardIcon, ShieldIcon, UsersIcon } from "@/components/auth/icons";
+import { ClipboardIcon, ShieldIcon, UsersIcon } from "@/components/icons";
 import { LowPolyScene } from "@/components/auth/low-poly-scene";
-
-// Font tròn, dày kiểu game, có đủ dấu tiếng Việt.
-const baloo = Baloo_2({ subsets: ["latin", "vietnamese"], variable: "--font-baloo", display: "swap" });
 
 const FEATURES = [
   { icon: ShieldIcon, label: "Bảo mật 2 lớp" },
@@ -36,7 +32,7 @@ function Island({ className = "" }: { className?: string }) {
  */
 export default function AuthLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className={`${baloo.variable} relative h-dvh overflow-hidden bg-background`}>
+    <div className="relative h-dvh overflow-hidden bg-background">
       <LowPolyScene />
 
       <div className="relative flex h-full items-center justify-center p-3 sm:p-6">

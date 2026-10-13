@@ -2,7 +2,7 @@
 
 // Ô nhập, nút và thông báo dùng chung cho các form đăng nhập / đăng ký / xác thực hai lớp.
 import { useId, useState, type ComponentType, type InputHTMLAttributes, type SVGProps } from "react";
-import { AlertIcon, CheckIcon, EyeIcon, EyeOffIcon } from "./icons";
+import { AlertIcon, CheckIcon, EyeIcon, EyeOffIcon } from "@/components/icons";
 import { inputClass, primaryButtonClass } from "./styles";
 
 type IconType = ComponentType<SVGProps<SVGSVGElement>>;

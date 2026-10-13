@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   // Các gói nội bộ xuất thẳng mã TypeScript, Next sẽ tự biên dịch chúng.
   transpilePackages: ["@lw/assets", "@lw/shared", "@lw/ui"],
   outputFileTracingRoot: monorepoRoot,
+  // Bài học không còn là mục riêng: được mở từ bên trong khu vực (/lands/[landId]/areas/[areaId]).
+  async redirects() {
+    return [
+      { source: "/lessons", destination: "/lands", permanent: false },
+      { source: "/lessons/:path*", destination: "/lands", permanent: false },
+    ];
+  },
   turbopack: {
     root: monorepoRoot,
     rules: {
