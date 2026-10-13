@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Cho máy chủ Node.js (apps/realtime)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "target": "ES2023",
+    "types": ["node"]
+  }
+}

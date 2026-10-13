@@ -1,0 +1,30 @@
+{
+  "name": "@lw/realtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx watch src/index.ts",
+    "build": "node build.mjs",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@colyseus/schema": "^5.0.39",
+    "@colyseus/tools": "^0.18.9",
+    "colyseus": "^0.18.9"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@lw/shared": "workspace:*",
+    "@lw/tsconfig": "workspace:*",
+    "@types/node": "^22",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}

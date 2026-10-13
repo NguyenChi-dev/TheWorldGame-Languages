@@ -1,0 +1,22 @@
+{
+  "name": "language-world",
+  "private": true,
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "supabase": "supabase"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10",
+    "supabase": "^2.120.0",
+    "turbo": "^2.11.7",
+    "typescript": "^5.9.3"
+  }
+}

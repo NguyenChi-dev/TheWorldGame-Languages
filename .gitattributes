@@ -1,0 +1,4 @@
+# Luôn lưu file văn bản với xuống dòng kiểu LF (khớp với Prettier), kể cả trên Windows.
+* text=auto eol=lf
+
+*.png binary

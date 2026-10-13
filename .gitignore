@@ -1,0 +1,24 @@
+# Thư viện cài bằng pnpm
+node_modules/
+
+# Kết quả build và cache
+.next/
+.turbo/
+dist/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Biến môi trường: chứa khóa, KHÔNG commit (các file .env.example thì được commit)
+.env
+.env*.local
+
+# Supabase CLI (file tạm khi chạy local)
+supabase/.temp/
+supabase/.branches/
+
+# Log và rác hệ điều hành
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db

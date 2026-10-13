@@ -1,0 +1,25 @@
+{
+  "name": "@lw/game",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^9.30.0",
+    "@babylonjs/loaders": "^9.30.0",
+    "@lw/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@lw/tsconfig": "workspace:*",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}

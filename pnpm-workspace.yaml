@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# pnpm chặn script cài đặt của thư viện theo mặc định (để an toàn).
+# Chỉ cho phép những gói thật sự cần chạy script khi cài (để tải file nhị phân).
+onlyBuiltDependencies:
+  - esbuild
+  - unrs-resolver
+
+# Gói có script cài đặt nhưng không cần chạy (đã có bản dựng sẵn); ghi rõ để pnpm không cảnh báo.
+ignoredBuiltDependencies:
+  - msgpackr-extract

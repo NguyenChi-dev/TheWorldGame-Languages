@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* Cho Tailwind quét class trong các component dùng chung ở packages/ui */
+@source "../../../../packages/ui/src";
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+}
