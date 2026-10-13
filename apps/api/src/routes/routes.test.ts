@@ -14,6 +14,8 @@ vi.mock("../lib/supabase", () => ({
   getSupabaseAdmin: () => ({
     auth: {
       getClaims: async (token: string) => {
+        // Giống Supabase thật: có loại token rác làm getClaims ném lỗi thay vì trả về error.
+        if (token === "token-lam-hong") throw new Error("Invalid UTF-8 sequence");
         const user = USERS[token];
         return user
           ? { data: { claims: { sub: user.sub, email: user.email, role: "authenticated" } }, error: null }
@@ -53,6 +55,11 @@ describe("GET /me", () => {
     const res = await app.request("/me", asUser("token-gia-mao"));
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn" });
+  });
+
+  it("token rác làm Supabase ném lỗi vẫn trả 401, không phải 500", async () => {
+    const res = await app.request("/me", asUser("token-lam-hong"));
+    expect(res.status).toBe(401);
   });
 });
 

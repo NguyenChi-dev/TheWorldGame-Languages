@@ -35,7 +35,11 @@ export const auth = createMiddleware<AuthEnv>(async (c, next) => {
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new ApiError(503, Messages.supabaseNotConfigured);
 
-  const { data, error } = await supabase.auth.getClaims(token);
+  // Với một số token rác (ví dụ "abc.def.ghi"), getClaims NÉM lỗi thay vì trả về `error`,
+  // nên phải bắt cả hai trường hợp. Token không đọc được = chưa đăng nhập hợp lệ (401), không phải lỗi máy chủ.
+  const { data, error } = await supabase.auth.getClaims(token).catch(() => {
+    throw new ApiError(401, Messages.invalidSession);
+  });
   if (error) {
     if (isAuthRetryableFetchError(error)) throw new ApiError(503, Messages.supabaseUnavailable);
     throw new ApiError(401, Messages.invalidSession);
