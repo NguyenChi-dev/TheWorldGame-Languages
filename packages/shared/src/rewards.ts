@@ -1,5 +1,5 @@
 /**
- * Công thức thưởng vàng. Chỉ máy chủ web (API route) được dùng các hàm này để cộng vàng thật;
+ * Công thức thưởng vàng. Chỉ apps/api được dùng các hàm này để cộng vàng thật;
  * phía trình duyệt chỉ dùng để hiển thị trước con số.
  */
 import { SEEDS, type SeedId } from "./seeds";

@@ -9,11 +9,15 @@ export type LanguageCode = "en";
 /** Cấp độ từ vựng: 1 là dễ nhất. */
 export type WordLevel = 1 | 2 | 3;
 
+/** Vai trò trong bảng profiles.role. Chỉ máy chủ được đổi. */
+export type PlayerRole = "player" | "admin";
+
 /** Tài khoản người chơi (bảng profiles). */
 export interface Player {
   id: string;
   username: string;
   gold: number;
+  role: PlayerRole;
   createdAt: string;
 }
 
