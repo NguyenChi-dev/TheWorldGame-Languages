@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Baloo_2 } from "next/font/google";
+// CSS của Font Awesome nạp một lần ở đây (xem components/fa-icon.tsx).
+import "@fortawesome/fontawesome-svg-core/styles.css";
 import "./globals.css";
 
 // Font tròn, dày kiểu game (có đủ dấu tiếng Việt), dùng bằng class font-game (xem globals.css).

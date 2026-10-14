@@ -98,72 +98,91 @@ export function AreaForm({
 
   return (
     <>
-      <form onSubmit={submit} className="space-y-3">
-        <Field label="Tên khu vực">
-          {(id) => (
-            <input
-              id={id}
-              required
-              maxLength={80}
-              value={name}
-              placeholder="Ví dụ: Nông trại"
-              onChange={(event) => setName(event.target.value)}
-              className={fieldClass}
-            />
-          )}
-        </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label="Kỹ năng luyện tập"
-            hint={area && lessonCount > 0 ? `Đang có ${lessonCount} bài học.` : undefined}
-          >
-            {(id) => (
-              <select
-                id={id}
-                value={skill}
-                onChange={(event) => setSkill(event.target.value as Skill)}
-                className={fieldClass}
-              >
-                {SKILLS.map((value) => (
-                  <option key={value} value={value}>
-                    {SKILL_LABELS[value]}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field label="Mẫu cảnh 3D">
-            {(id) => (
-              <select
-                id={id}
-                value={scene}
-                onChange={(event) => setScene(event.target.value as AreaScene)}
-                className={fieldClass}
-              >
-                {AREA_SCENES.map((value) => (
-                  <option key={value} value={value}>
-                    {AREA_SCENE_LABELS[value]}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+      <form onSubmit={submit}>
+        <div className="grid gap-5 md:grid-cols-2">
+          {/* Cột trái: ảnh + điều kiện mở khóa */}
+          <div className="space-y-4">
+            <ImageUploader folder="areas" value={cover} onChange={setCover} label="Ảnh khu vực" />
+            <Field
+              label="Điều kiện mở khóa (JSON)"
+              hint='Để trống = không điều kiện. Ví dụ: {"lessons_done": 3}'
+            >
+              {(id) => (
+                <textarea
+                  id={id}
+                  rows={3}
+                  value={requirementText}
+                  placeholder='{"lessons_done": 3}'
+                  onChange={(event) => setRequirementText(event.target.value)}
+                  className={`${fieldClass} resize-none font-mono`}
+                />
+              )}
+            </Field>
+          </div>
+
+          {/* Cột phải: tên, kỹ năng, mẫu cảnh */}
+          <div className="space-y-4">
+            <Field label="Tên khu vực">
+              {(id) => (
+                <input
+                  id={id}
+                  required
+                  maxLength={80}
+                  value={name}
+                  placeholder="Ví dụ: Nông trại"
+                  onChange={(event) => setName(event.target.value)}
+                  className={`${fieldClass} text-base font-semibold`}
+                />
+              )}
+            </Field>
+            <Field
+              label="Kỹ năng luyện tập"
+              hint={
+                area && lessonCount > 0
+                  ? `Đang có ${lessonCount} bài học: đổi kỹ năng sẽ hỏi xác nhận.`
+                  : "Mỗi khu vực luyện một kỹ năng, mỗi kỹ năng có mini-game riêng."
+              }
+            >
+              {(id) => (
+                <select
+                  id={id}
+                  value={skill}
+                  onChange={(event) => setSkill(event.target.value as Skill)}
+                  className={fieldClass}
+                >
+                  {SKILLS.map((value) => (
+                    <option key={value} value={value}>
+                      {SKILL_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            <Field label="Mẫu cảnh 3D" hint="Khung cảnh người chơi thấy khi vào khu vực.">
+              {(id) => (
+                <select
+                  id={id}
+                  value={scene}
+                  onChange={(event) => setScene(event.target.value as AreaScene)}
+                  className={fieldClass}
+                >
+                  {AREA_SCENES.map((value) => (
+                    <option key={value} value={value}>
+                      {AREA_SCENE_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+          </div>
         </div>
-        <ImageUploader folder="areas" value={cover} onChange={setCover} label="Ảnh khu vực" />
-        <Field label="Điều kiện mở khóa (JSON)" hint='Để trống = không điều kiện. Ví dụ: {"lessons_done": 3}'>
-          {(id) => (
-            <textarea
-              id={id}
-              rows={3}
-              value={requirementText}
-              placeholder='{"lessons_done": 3}'
-              onChange={(event) => setRequirementText(event.target.value)}
-              className={`${fieldClass} font-mono`}
-            />
-          )}
-        </Field>
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        <div className="flex justify-end gap-2 pt-1">
+
+        {error ? (
+          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-5 flex items-center justify-end gap-2 border-t border-secondary pt-3">
           {onDone ? (
             <Button variant="ghost" size="sm" onClick={onDone} disabled={pending}>
               Hủy

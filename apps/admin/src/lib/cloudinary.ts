@@ -52,7 +52,9 @@ export function rootFolder(): string {
 export function verifyUploadResponse(publicId: string, version: number, signature: string): boolean {
   const { apiSecret } = requireConfig();
   // Cùng thuật toán với utils.verify_api_response_signature của SDK (hàm đó thiếu trong bộ kiểu TypeScript).
-  const expected = Buffer.from(cloudinary.utils.api_sign_request({ public_id: publicId, version }, apiSecret));
+  const expected = Buffer.from(
+    cloudinary.utils.api_sign_request({ public_id: publicId, version }, apiSecret),
+  );
   const received = Buffer.from(signature);
   // So sánh thời gian không đổi: không lộ chữ ký đúng qua thời gian phản hồi.
   return expected.length === received.length && timingSafeEqual(expected, received);

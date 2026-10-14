@@ -1,9 +1,23 @@
 "use client";
 
+import { faArrowDown, faArrowUp, faGripVertical } from "@fortawesome/free-solid-svg-icons";
 import { useState, type ReactNode } from "react";
+import { FaIcon } from "@/components/fa-icon";
+
+/** Nút điều khiển thứ tự, truyền cho renderItem (dạng lưới tự đặt các nút này vào thẻ). */
+export interface SortControls {
+  /** Biểu tượng kéo (grip). */
+  handle: ReactNode;
+  moveBack: () => void;
+  moveForward: () => void;
+  canMoveBack: boolean;
+  canMoveForward: boolean;
+}
 
 /**
- * Danh sách đổi thứ tự bằng kéo thả (HTML5 drag & drop, không cần thư viện) và nút ↑ ↓ cho bàn phím.
+ * Danh sách đổi thứ tự bằng kéo thả (HTML5 drag & drop, không cần thư viện) và nút cho bàn phím.
+ * - variant "list": mỗi mục một dòng, tự vẽ nút kéo và ↑ ↓ ở đầu dòng.
+ * - variant "grid": lưới thẻ; renderItem nhận `controls` để tự đặt nút trong thẻ.
  * Đổi xong gọi onReorder(danh sách mới). Trả về false (máy chủ từ chối) thì danh sách quay về như cũ.
  */
 export function SortableList<T>({
@@ -12,12 +26,17 @@ export function SortableList<T>({
   onReorder,
   renderItem,
   disabled,
+  variant = "list",
+  trailing,
 }: {
   items: T[];
   getId: (item: T) => string;
   onReorder: (next: T[]) => Promise<boolean>;
-  renderItem: (item: T, index: number) => ReactNode;
+  renderItem: (item: T, index: number, controls: SortControls) => ReactNode;
   disabled?: boolean;
+  variant?: "list" | "grid";
+  /** Phần tử thêm vào cuối danh sách, không kéo được (ví dụ thẻ "Thêm mới"). */
+  trailing?: ReactNode;
 }) {
   const [list, setList] = useState(items);
   const [source, setSource] = useState(items);
@@ -45,66 +64,93 @@ export function SortableList<T>({
     void commit(next);
   }
 
+  const grid = variant === "grid";
+
   return (
-    <ul className="divide-y divide-secondary">
-      {list.map((item, index) => (
-        <li
-          key={getId(item)}
-          draggable={!disabled}
-          onDragStart={(event) => {
-            setDragIndex(index);
-            event.dataTransfer.effectAllowed = "move";
-          }}
-          onDragOver={(event) => {
-            if (dragIndex === null) return;
-            event.preventDefault();
-            setOverIndex(index);
-          }}
-          onDragLeave={() => setOverIndex((current) => (current === index ? null : current))}
-          onDrop={(event) => {
-            event.preventDefault();
-            if (dragIndex !== null) move(dragIndex, index);
-            setDragIndex(null);
-            setOverIndex(null);
-          }}
-          onDragEnd={() => {
-            setDragIndex(null);
-            setOverIndex(null);
-          }}
-          className={`flex items-center gap-2 py-2 transition-colors ${dragIndex === index ? "opacity-40" : ""} ${
-            overIndex === index && dragIndex !== index ? "bg-secondary/60" : ""
-          }`}
-        >
-          <span className="flex shrink-0 items-center gap-0.5 text-slate-400">
-            <span
-              aria-hidden="true"
-              title="Kéo để đổi thứ tự"
-              className="cursor-grab px-1 text-base leading-none"
-            >
-              ⠿
-            </span>
-            <button
-              type="button"
-              aria-label="Đưa lên"
-              disabled={disabled || index === 0}
-              onClick={() => move(index, index - 1)}
-              className="rounded px-1 text-xs hover:bg-secondary hover:text-accent disabled:invisible"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              aria-label="Đưa xuống"
-              disabled={disabled || index === list.length - 1}
-              onClick={() => move(index, index + 1)}
-              className="rounded px-1 text-xs hover:bg-secondary hover:text-accent disabled:invisible"
-            >
-              ↓
-            </button>
+    <ul className={grid ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3" : "divide-y divide-secondary"}>
+      {list.map((item, index) => {
+        const handle = (
+          <span
+            aria-hidden="true"
+            title="Kéo để đổi thứ tự"
+            className="cursor-grab select-none px-1 text-sm active:cursor-grabbing"
+          >
+            <FaIcon icon={faGripVertical} />
           </span>
-          <div className="min-w-0 flex-1">{renderItem(item, index)}</div>
-        </li>
-      ))}
+        );
+        const controls: SortControls = {
+          handle,
+          moveBack: () => move(index, index - 1),
+          moveForward: () => move(index, index + 1),
+          canMoveBack: !disabled && index > 0,
+          canMoveForward: !disabled && index < list.length - 1,
+        };
+        const dragging = dragIndex === index;
+        const over = overIndex === index && dragIndex !== index;
+        return (
+          <li
+            key={getId(item)}
+            draggable={!disabled}
+            onDragStart={(event) => {
+              setDragIndex(index);
+              event.dataTransfer.effectAllowed = "move";
+            }}
+            onDragOver={(event) => {
+              if (dragIndex === null) return;
+              event.preventDefault();
+              setOverIndex(index);
+            }}
+            onDragLeave={() => setOverIndex((current) => (current === index ? null : current))}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (dragIndex !== null) move(dragIndex, index);
+              setDragIndex(null);
+              setOverIndex(null);
+            }}
+            onDragEnd={() => {
+              setDragIndex(null);
+              setOverIndex(null);
+            }}
+            className={
+              grid
+                ? `rounded-2xl transition ${dragging ? "opacity-40" : ""} ${over ? "ring-2 ring-primary ring-offset-2" : ""}`
+                : `flex items-center gap-2 py-2 transition-colors ${dragging ? "opacity-40" : ""} ${
+                    over ? "bg-secondary/60" : ""
+                  }`
+            }
+          >
+            {grid ? (
+              renderItem(item, index, controls)
+            ) : (
+              <>
+                <span className="flex shrink-0 items-center gap-0.5 text-slate-400">
+                  {handle}
+                  <button
+                    type="button"
+                    aria-label="Đưa lên"
+                    disabled={!controls.canMoveBack}
+                    onClick={controls.moveBack}
+                    className="rounded px-1 text-xs hover:bg-secondary hover:text-accent disabled:invisible"
+                  >
+                    <FaIcon icon={faArrowUp} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Đưa xuống"
+                    disabled={!controls.canMoveForward}
+                    onClick={controls.moveForward}
+                    className="rounded px-1 text-xs hover:bg-secondary hover:text-accent disabled:invisible"
+                  >
+                    <FaIcon icon={faArrowDown} />
+                  </button>
+                </span>
+                <div className="min-w-0 flex-1">{renderItem(item, index, controls)}</div>
+              </>
+            )}
+          </li>
+        );
+      })}
+      {trailing ? <li>{trailing}</li> : null}
     </ul>
   );
 }

@@ -1,17 +1,41 @@
 "use client";
 
+import { faGripVertical, faPlus } from "@fortawesome/free-solid-svg-icons";
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { AREA_SCENE_LABELS, SKILL_LABELS, type Area } from "@lw/shared";
+import { AREA_SCENE_LABELS, type Area } from "@lw/shared";
 import { Button, Dialog, Switch, useToast } from "@lw/ui";
-import { Badge } from "@/components/badge";
+import { CoverImage } from "@/components/cover-image";
+import { SCENE_ICONS } from "@/components/content-icons";
+import { FaIcon } from "@/components/fa-icon";
+import { SkillBadge } from "@/components/skill-badge";
 import { SortableList } from "@/components/sortable-list";
+import { cloudinaryThumb } from "@/lib/media-url";
 import { reorderAreas, setAreaActive } from "../actions";
 import { AreaForm } from "./area-form";
 
 export interface AreaRow {
   area: Area;
   lessonCount: number;
+  coverUrl: string | null;
+}
+
+/** Ảnh nhỏ của khu vực; chưa có ảnh (hoặc ảnh mất trên Cloudinary) thì hiện icon của mẫu cảnh. */
+function AreaThumb({ area, coverUrl }: { area: Area; coverUrl: string | null }) {
+  const placeholder = (
+    <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
+      <FaIcon icon={SCENE_ICONS[area.scene]} className="text-lg" />
+    </span>
+  );
+  if (!coverUrl) return placeholder;
+  return (
+    <CoverImage
+      src={cloudinaryThumb(coverUrl, 96)}
+      alt={`Ảnh khu vực ${area.name}`}
+      className="size-12 shrink-0 rounded-xl object-cover ring-1 ring-secondary"
+      fallback={placeholder}
+    />
+  );
 }
 
 /** Danh sách khu vực của một vùng đất: kéo thả đổi thứ tự MỞ KHÓA, công tắc bật/tắt, thêm khu vực. */
@@ -45,38 +69,52 @@ export function AreasManager({ landId, rows }: { landId: string; rows: AreaRow[]
 
   return (
     <section className="min-w-0 rounded-2xl border border-secondary bg-white p-4 shadow-sm">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="font-game text-base font-bold text-slate-900">Khu vực ({rows.length})</h2>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-game text-lg font-bold text-slate-900">Khu vực ({rows.length})</h2>
+          <p className="text-xs text-slate-500">
+            Kéo <FaIcon icon={faGripVertical} /> (hoặc bấm ↑ ↓) để đổi thứ tự mở khóa: khu vực trên cùng mở
+            trước.
+          </p>
+        </div>
         <Button size="sm" onClick={() => setAdding(true)}>
-          + Thêm khu vực
+          <FaIcon icon={faPlus} />
+          Thêm khu vực
         </Button>
       </div>
-      <p className="mb-2 text-xs text-slate-500">
-        Kéo ⠿ (hoặc bấm ↑ ↓) để đổi thứ tự mở khóa: khu vực trên cùng mở trước.
-      </p>
 
       {rows.length === 0 ? (
-        <p className="py-6 text-center text-sm text-slate-500">Vùng đất này chưa có khu vực nào.</p>
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="mt-3 flex w-full flex-col items-center gap-1 rounded-xl border-2 border-dashed border-primary/40 py-8 text-center transition hover:border-primary hover:bg-secondary/40"
+        >
+          <span className="font-semibold text-slate-700">Vùng đất này chưa có khu vực nào</span>
+          <span className="text-xs text-slate-500">
+            Bấm để thêm khu vực đầu tiên (nông trại, chợ, công viên...)
+          </span>
+        </button>
       ) : (
         <SortableList
           items={rows}
           getId={(row) => row.area.id}
           onReorder={onReorder}
           disabled={pending}
-          renderItem={({ area, lessonCount }, index) => {
+          renderItem={({ area, lessonCount, coverUrl }, index) => {
             const isActive = active[area.id] ?? area.isActive;
             return (
-              <div className="flex items-center gap-3">
-                <span className="w-5 shrink-0 text-right text-xs font-semibold text-slate-400">
+              <div className="flex items-center gap-3 rounded-xl px-1 py-0.5">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-accent">
                   {index + 1}
                 </span>
+                <AreaThumb area={area} coverUrl={coverUrl} />
                 <Link href={`/lands/${landId}/areas/${area.id}`} className="min-w-0 flex-1 hover:text-accent">
                   <span className="block truncate text-sm font-semibold">{area.name}</span>
                   <span className="block truncate text-xs text-slate-400">
                     {AREA_SCENE_LABELS[area.scene]} · {lessonCount} bài học
                   </span>
                 </Link>
-                <Badge>{SKILL_LABELS[area.skill]}</Badge>
+                <SkillBadge skill={area.skill} />
                 <Switch
                   checked={isActive}
                   onCheckedChange={(value) => toggle(area, value)}
@@ -89,7 +127,13 @@ export function AreasManager({ landId, rows }: { landId: string; rows: AreaRow[]
         />
       )}
 
-      <Dialog open={adding} onClose={() => setAdding(false)} title="Thêm khu vực">
+      <Dialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="Thêm khu vực"
+        description="Mỗi khu vực luyện một kỹ năng và dùng một mẫu cảnh 3D."
+        size="lg"
+      >
         {adding ? <AreaForm landId={landId} onDone={() => setAdding(false)} /> : null}
       </Dialog>
     </section>

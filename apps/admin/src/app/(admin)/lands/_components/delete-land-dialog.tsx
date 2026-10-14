@@ -1,6 +1,8 @@
 "use client";
 
+import { faTrashCan, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { useState, useTransition } from "react";
+import { FaIcon } from "@/components/fa-icon";
 import type { Land } from "@lw/shared";
 import { Button, Dialog, useToast } from "@lw/ui";
 import { Field, fieldClass } from "@/components/fields";
@@ -65,6 +67,7 @@ export function DeleteLandDialog({
             onClick={confirm}
             disabled={pending || typed.trim() !== land.slug}
           >
+            <FaIcon icon={faTrashCan} />
             {pending ? "Đang xóa..." : "Xóa vĩnh viễn"}
           </Button>
         </>
@@ -76,7 +79,8 @@ export function DeleteLandDialog({
           khỏi người chơi, hãy <strong>tắt</strong> nó thay vì xóa.
         </p>
         {areaCount > 0 ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-red-700">
+          <p className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-red-700">
+            <FaIcon icon={faTriangleExclamation} />
             Vùng đất đang có {areaCount} khu vực nên sẽ không xóa được.
           </p>
         ) : null}
