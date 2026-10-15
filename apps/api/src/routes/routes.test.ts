@@ -43,6 +43,8 @@ const USERS: Record<string, { sub: string; email: string; role: string; aal: str
 
 // Công tắc admin_settings.require_mfa trong database giả. vi.hoisted: dùng được bên trong vi.mock.
 const settings = vi.hoisted(() => ({ requireMfa: true }));
+// Vùng đất đang bật duy nhất trong database giả.
+const ACTIVE_LAND = vi.hoisted(() => "a1111111-1111-4111-8111-111111111111");
 
 // Supabase giả: getClaims nhận các token ở trên, from("profiles") trả về vai trò tương ứng.
 vi.mock("../lib/supabase", () => ({
@@ -68,14 +70,26 @@ vi.mock("../lib/supabase", () => ({
           maybeSingle: async () => ({
             data:
               table === "profiles"
-                ? { role: Object.values(USERS).find((u) => u.sub === id)?.role, username: "Mèo_Ú" }
+                ? {
+                    role: Object.values(USERS).find((u) => u.sub === id)?.role,
+                    username: "Mèo_Ú",
+                    appearance: null,
+                    land_id: null,
+                  }
                 : null,
             error: null,
+          }),
+          // lands.select("id").eq("id", ...).eq("is_active", true): chỉ ACTIVE_LAND đang bật.
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: table === "lands" && id === ACTIVE_LAND ? { id } : null,
+              error: null,
+            }),
           }),
         }),
       }),
       // profiles.update({ username }).eq("id", ...).select().maybeSingle(): tên "Trùng_Tên" giả lập trùng.
-      update: (values: { username: string }) => ({
+      update: (values: { username?: string; appearance?: object; land_id?: string }) => ({
         eq: (_column: string, id: string) => ({
           select: () => ({
             maybeSingle: async () =>
@@ -83,7 +97,10 @@ vi.mock("../lib/supabase", () => ({
                 ? { data: null, error: { code: "23505", message: "duplicate key" } }
                 : {
                     data: {
-                      username: values.username,
+                      username: "Mèo_Ú",
+                      appearance: null,
+                      land_id: null,
+                      ...values,
                       role: Object.values(USERS).find((u) => u.sub === id)?.role,
                     },
                     error: null,
@@ -113,6 +130,8 @@ describe("GET /me", () => {
       email: "an@example.com",
       username: "Mèo_Ú",
       role: "player",
+      appearance: null,
+      landId: null,
     });
   });
 
@@ -146,6 +165,52 @@ describe("PATCH /me", () => {
     const res = await patch(PLAYER_TOKEN, { username: "a b" });
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "Dữ liệu gửi lên không hợp lệ: username" });
+  });
+
+  const look = { gender: "male", hat: "bearskin", top: "kimono", bottom: "chima" };
+
+  it("chọn nhân vật kèm tên: lưu cả hai (phối đồ tự do)", async () => {
+    const res = await patch(PLAYER_TOKEN, { username: "Mèo_Mập", appearance: look });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ username: "Mèo_Mập", appearance: look });
+  });
+
+  it("chỉ đổi ngoại hình, giữ nguyên tên", async () => {
+    const res = await patch(PLAYER_TOKEN, { appearance: look });
+    expect(await res.json()).toMatchObject({ username: "Mèo_Ú", appearance: look });
+  });
+
+  it.each([
+    [{ ...look, hat: "rong" }, "appearance.hat"],
+    [{ ...look, gender: "khac" }, "appearance.gender"],
+    [{ gender: "male", hat: "none", top: "aodai" }, "appearance.bottom"],
+    [{ ...look, mau: "do" }, "appearance"],
+  ])("ngoại hình sai %j: 400 nêu trường", async (appearance, field) => {
+    const res = await patch(PLAYER_TOKEN, { appearance });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: `Dữ liệu gửi lên không hợp lệ: ${field}` });
+  });
+
+  it("không gửi gì: 400", async () => {
+    expect((await patch(PLAYER_TOKEN, {})).status).toBe(400);
+  });
+
+  it("chọn vùng đất đang bật: lưu landId", async () => {
+    const res = await patch(PLAYER_TOKEN, { landId: ACTIVE_LAND });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ landId: ACTIVE_LAND });
+  });
+
+  it("vùng đất không có / đang tắt: 404, không lưu", async () => {
+    const res = await patch(PLAYER_TOKEN, { landId: "b2222222-2222-4222-8222-222222222222" });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Vùng đất không tồn tại hoặc đang đóng" });
+  });
+
+  it("landId không phải uuid: 400", async () => {
+    const res = await patch(PLAYER_TOKEN, { landId: "tieng-anh" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Dữ liệu gửi lên không hợp lệ: landId" });
   });
 
   it("trùng tên: 409", async () => {

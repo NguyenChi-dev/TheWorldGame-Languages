@@ -5,12 +5,13 @@ import { NextResponse, type NextRequest } from "next/server";
  * Proxy chạy TRƯỚC mọi trang web (Next.js 16: middleware.ts đổi tên thành proxy.ts).
  *
  *   1. Làm mới phiên đăng nhập Supabase (ghi lại cookie khi token sắp hết hạn).
- *   2. Trang game (/play) chỉ mở khi đã đăng nhập; chưa đăng nhập thì chuyển về /login.
+ *   2. Trang game (/play), màn tạo nhân vật (/character) và chọn vùng đất (/lands) chỉ mở khi đã đăng nhập;
+ *      chưa đăng nhập thì chuyển về /login.
  *
  * Đây là lớp chuyển hướng nhanh. Trang /play vẫn tự kiểm tra lại phiên ở máy chủ (app/play/page.tsx).
  */
 /** Trang chỉ dành cho người đã đăng nhập. Trang chủ, /login, /auth/callback mở tự do. */
-const PROTECTED_PATHS = ["/play"];
+const PROTECTED_PATHS = ["/play", "/character", "/lands"];
 
 function isProtected(pathname: string) {
   return PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));

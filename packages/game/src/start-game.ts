@@ -2,7 +2,7 @@
 // Sau này nếu cần giảm dung lượng, có thể đổi sang nhập từng file như "@babylonjs/core/scene".
 import { Engine, PointerEventTypes, Scene } from "@babylonjs/core";
 import { registerBuiltInLoaders } from "@babylonjs/loaders/dynamic";
-import type { RemotePlayer } from "@lw/shared";
+import { DEFAULT_APPEARANCE, type CharacterAppearance, type RemotePlayer } from "@lw/shared";
 import { createCamera, createLights, fitCameraToScreen } from "./scene/environment";
 import { createGroundGrid, pickTile, type TilePosition } from "./scene/ground";
 import { LocalPlayer, RemotePlayers } from "./scene/players";
@@ -10,6 +10,8 @@ import { LocalPlayer, RemotePlayers } from "./scene/players";
 export type { TilePosition };
 
 export interface StartGameOptions {
+  /** Ngoại hình nhân vật người chơi đã phối. Mặc định DEFAULT_APPEARANCE. */
+  appearance?: CharacterAppearance;
   /** Gọi khi người chơi chạm (hoặc bấm chuột) vào một ô đất. */
   onTileTap?: (tile: TilePosition) => void;
   /** Tỉ lệ điểm ảnh tối đa khi vẽ. Màn hình nét cao (3x) sẽ chỉ vẽ ở mức này. Mặc định 2. */
@@ -54,7 +56,7 @@ export function startGame(canvas: HTMLCanvasElement, options: StartGameOptions =
   engine.onResizeObservable.add(() => fitCameraToScreen(camera));
   createGroundGrid(scene);
 
-  const localPlayer = new LocalPlayer(scene);
+  const localPlayer = new LocalPlayer(scene, options.appearance ?? DEFAULT_APPEARANCE);
   const remotePlayers = new RemotePlayers(scene);
 
   // POINTERTAP chỉ xảy ra khi chạm/bấm nhanh, không xảy ra khi đang kéo xoay camera.

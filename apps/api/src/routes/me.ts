@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { isRole } from "@lw/shared";
+import { isRole, parseAppearance } from "@lw/shared";
 import { UpdateMeRequest, type MeResponse } from "@lw/shared/api";
 import { ApiError, Messages } from "../lib/errors.js";
 import { getSupabaseAdmin } from "../lib/supabase.js";
@@ -17,27 +17,31 @@ function supabaseOrFail() {
   return supabase;
 }
 
+const PROFILE_COLUMNS = "username, role, appearance, land_id";
+
 function toMe(
   user: { id: string; email: string | null },
-  row: { username?: unknown; role?: unknown } | null,
+  row: { username?: unknown; role?: unknown; appearance?: unknown; land_id?: unknown } | null,
 ): MeResponse {
   return {
     id: user.id,
     email: user.email,
     username: typeof row?.username === "string" ? row.username : null,
     role: isRole(row?.role) ? row.role : "player",
+    appearance: parseAppearance(row?.appearance),
+    landId: typeof row?.land_id === "string" ? row.land_id : null,
   };
 }
 
 export const meRoutes = new Hono<AuthEnv>()
   .use(auth)
 
-  /** GET /me: id, email (từ token) + tên nhân vật, vai trò (từ database). */
+  /** GET /me: id, email (từ token) + tên nhân vật, vai trò, ngoại hình, vùng đất đang chọn (từ database). */
   .get("/", async (c) => {
     const user = c.get("user");
     const { data, error } = await supabaseOrFail()
       .from("profiles")
-      .select("username, role")
+      .select(PROFILE_COLUMNS)
       .eq("id", user.id)
       .maybeSingle();
     if (error) {
@@ -47,20 +51,43 @@ export const meRoutes = new Hono<AuthEnv>()
     return c.json(toMe(user, data));
   })
 
-  /** PATCH /me: đổi tên nhân vật. Chỉ đổi được cột username của CHÍNH mình (không bao giờ đổi role). */
+  /**
+   * PATCH /me: đổi tên nhân vật, ngoại hình (màn chọn nhân vật) và / hoặc vùng đất (màn chọn vùng đất).
+   * Chỉ đổi được cột username, appearance, land_id của CHÍNH mình (không bao giờ đổi role).
+   * Vùng đất phải tồn tại và đang bật.
+   */
   .patch("/", validate("json", UpdateMeRequest), async (c) => {
     const user = c.get("user");
-    const { username } = c.req.valid("json");
-    const { data, error } = await supabaseOrFail()
+    const { username, appearance, landId } = c.req.valid("json");
+    const supabase = supabaseOrFail();
+    const changes: { username?: string; appearance?: object; land_id?: string } = {};
+    if (username !== undefined) changes.username = username;
+    if (appearance !== undefined) changes.appearance = appearance;
+    if (landId !== undefined) {
+      // Khóa bí mật bỏ qua RLS: tự kiểm tra vùng đất đang bật.
+      const { data: land, error: landError } = await supabase
+        .from("lands")
+        .select("id")
+        .eq("id", landId)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (landError) {
+        console.error("[me] Không đọc được lands:", landError.message);
+        throw new ApiError(500, Messages.internal);
+      }
+      if (!land) throw new ApiError(404, "Vùng đất không tồn tại hoặc đang đóng");
+      changes.land_id = landId;
+    }
+    const { data, error } = await supabase
       .from("profiles")
-      .update({ username })
+      .update(changes)
       .eq("id", user.id)
-      .select("username, role")
+      .select(PROFILE_COLUMNS)
       .maybeSingle();
     if (error) {
       // Trùng tên (kể cả khác hoa thường, xem index profiles_username_lower_key).
       if (error.code === "23505") throw new ApiError(409, "Tên nhân vật này đã có người dùng");
-      console.error("[me] Không đổi được username:", error.message);
+      console.error("[me] Không đổi được hồ sơ:", error.message);
       throw new ApiError(500, Messages.internal);
     }
     if (!data) throw new ApiError(404, "Không tìm thấy hồ sơ người chơi");

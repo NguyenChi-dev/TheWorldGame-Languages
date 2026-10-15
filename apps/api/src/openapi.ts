@@ -184,7 +184,8 @@ export const ROUTES: RouteDoc[] = [
     path: "/me",
     tag: TAGS.account,
     summary: "Hồ sơ người đang đăng nhập",
-    description: "id, email lấy từ token; tên nhân vật và vai trò đọc từ bảng profiles.",
+    description:
+      "id, email lấy từ token; tên nhân vật, vai trò, ngoại hình nhân vật (appearance) và vùng đất đang chọn (landId) đọc từ bảng profiles; null = chưa chọn.",
     access: "user",
     response: MeResponse,
   },
@@ -192,12 +193,13 @@ export const ROUTES: RouteDoc[] = [
     method: "patch",
     path: "/me",
     tag: TAGS.account,
-    summary: "Đổi tên nhân vật",
-    description: "Chỉ đổi tên của chính mình. Trùng tên (không phân biệt hoa thường) trả 409.",
+    summary: "Đổi tên / chọn nhân vật / chọn vùng đất",
+    description:
+      "Chỉ đổi hồ sơ của chính mình. Gửi username, appearance (màn chọn nhân vật) và / hoặc landId (màn chọn vùng đất, phải đang bật, sai trả 404). Trùng tên (không phân biệt hoa thường) trả 409.",
     access: "user",
     body: UpdateMeRequest,
     response: MeResponse,
-    extraErrors: { 409: "Tên nhân vật đã có người dùng" },
+    extraErrors: { 404: "Vùng đất không tồn tại hoặc đang đóng", 409: "Tên nhân vật đã có người dùng" },
   },
   {
     method: "get",

@@ -16,6 +16,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { USERNAME_PATTERN, USERNAME_RULE } from "@lw/shared";
 import type { ActionState } from "@/lib/action-state";
+import { SERVER_API_URL } from "@/lib/server-api-url";
 import { createClient } from "@/lib/supabase/server";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -73,11 +74,6 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
 // Khi đã có SMTP riêng: đặt SIGNUP_REQUIRE_EMAIL_CONFIRM=true để bắt xác nhận email như cũ.
 // =============================================================================
 
-const API_URL = (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(
-  /\/+$/,
-  "",
-);
-
 /** Gọi apps/api tạo tài khoản. Trả về thông báo lỗi (tiếng Việt), hoặc null nếu tạo được. */
 async function createAccountViaApi(body: { email: string; password: string; username: string }) {
   const incoming = await headers();
@@ -85,7 +81,7 @@ async function createAccountViaApi(body: { email: string; password: string; user
   const ip = incoming.get("x-forwarded-for")?.split(",")[0]?.trim() || incoming.get("x-real-ip") || "";
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/auth/signup`, {
+    response = await fetch(`${SERVER_API_URL}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(ip ? { "X-Forwarded-For": ip } : {}) },
       body: JSON.stringify(body),

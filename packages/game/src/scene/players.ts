@@ -1,11 +1,12 @@
-import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Vector3 } from "@babylonjs/core";
-import type { RemotePlayer } from "@lw/shared";
+import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, TransformNode, Vector3 } from "@babylonjs/core";
+import type { CharacterAppearance, RemotePlayer } from "@lw/shared";
+import { CharacterModel, facingAngle, turnTowards } from "./character";
 import type { TilePosition } from "./ground";
 
 const MOVE_SPEED = 6; // đơn vị mỗi giây
 
 /** Di chuyển mượt mesh tới vị trí đích thay vì nhảy tức thì. */
-function stepTowards(mesh: Mesh, target: Vector3, deltaSeconds: number) {
+function stepTowards(mesh: TransformNode, target: Vector3, deltaSeconds: number) {
   const distance = Vector3.Distance(mesh.position, target);
   if (distance < 0.001) return;
   const t = Math.min(1, (MOVE_SPEED * deltaSeconds) / distance);
@@ -16,25 +17,30 @@ function deltaSeconds(scene: Scene) {
   return scene.getEngine().getDeltaTime() / 1000;
 }
 
-/** Nhân vật của chính người chơi (tạm thời là một khối hộp vàng). */
+/** Nhân vật của chính người chơi: nhân vật low-poly đã chọn ở màn chọn nhân vật. */
 export class LocalPlayer {
-  private readonly mesh: Mesh;
-  private readonly target = new Vector3(0, 0.5, 0);
+  private readonly model: CharacterModel;
+  private readonly target = Vector3.Zero();
 
-  constructor(scene: Scene) {
-    this.mesh = MeshBuilder.CreateBox("local-player", { size: 1 }, scene);
-    this.mesh.position.copyFrom(this.target);
-    this.mesh.isPickable = false;
+  constructor(scene: Scene, appearance: CharacterAppearance) {
+    this.model = new CharacterModel(scene, appearance, "local-player");
+    for (const mesh of this.model.parts) mesh.isPickable = false;
+    const root = this.model.root;
 
-    const material = new StandardMaterial("local-player-mat", scene);
-    material.diffuseColor = new Color3(1, 0.8, 0.2);
-    this.mesh.material = material;
-
-    scene.onBeforeRenderObservable.add(() => stepTowards(this.mesh, this.target, deltaSeconds(scene)));
+    scene.onBeforeRenderObservable.add(() => {
+      const dt = deltaSeconds(scene);
+      const dx = this.target.x - root.position.x;
+      const dz = this.target.z - root.position.z;
+      const walking = Math.hypot(dx, dz) > 0.02;
+      // Quay mặt theo hướng đi rồi bước tới.
+      if (walking) root.rotation.y = turnTowards(root.rotation.y, facingAngle(dx, dz), dt * 12);
+      stepTowards(root, this.target, dt);
+      this.model.update(dt, { walking });
+    });
   }
 
   moveTo(tile: TilePosition) {
-    this.target.set(tile.x, 0.5, tile.z);
+    this.target.set(tile.x, 0, tile.z);
   }
 }
 

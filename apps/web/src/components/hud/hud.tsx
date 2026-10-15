@@ -3,14 +3,17 @@
 import {
   faArrowRightFromBracket,
   faDoorOpen,
+  faEarthAsia,
   faServer,
   faTowerBroadcast,
   faUser,
   faUsersSlash,
 } from "@fortawesome/free-solid-svg-icons";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { signOut, signOutEverywhere } from "@/app/(world)/login/actions";
 import { FaIcon } from "@/components/fa-icon";
+import type { PlayerLand } from "@/lib/player";
 import { useGameStore } from "@/store/game-store";
 import { useApiHealth } from "./use-api-health";
 
@@ -86,10 +89,11 @@ function ExitMenu() {
 
 /**
  * Giao diện đè lên game:
- *   - trái: tấm gỗ có huy hiệu + tên nhân vật, nút gỗ Thoát (đăng xuất / đăng xuất mọi thiết bị);
+ *   - trái: tấm gỗ có huy hiệu + tên nhân vật, nút gỗ Thoát (đăng xuất / đăng xuất mọi thiết bị),
+ *     bảng vùng đất đang ở (bấm để đổi vùng đất);
  *   - phải: đèn trạng thái máy chủ realtime (người online) và máy chủ API.
  */
-export function Hud({ playerName }: { playerName: string }) {
+export function Hud({ playerName, land }: { playerName: string; land: PlayerLand }) {
   useApiHealth();
 
   const connection = useGameStore((state) => state.connection);
@@ -126,6 +130,17 @@ export function Hud({ playerName }: { playerName: string }) {
           </span>
         </div>
         <ExitMenu />
+        <Link href="/lands" className="hud-plate hud-land" title="Đổi vùng đất">
+          <FaIcon icon={faEarthAsia} className="text-lg text-amber-100" />
+          <span className="min-w-0">
+            <span className="block text-[10px] font-bold uppercase tracking-widest text-amber-200/90">
+              {land.languageCode.toUpperCase()}
+            </span>
+            <span className="block max-w-[26vw] truncate font-poly text-sm leading-tight text-[#fff4dc] [text-shadow:0_2px_0_#4a2a10] sm:max-w-[12rem]">
+              {land.name}
+            </span>
+          </span>
+        </Link>
       </div>
 
       <div className="flex flex-col items-end gap-2">

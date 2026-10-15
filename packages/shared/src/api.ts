@@ -9,6 +9,7 @@
  * Thêm route mới cho game thì khai báo schema ở đây khi bắt đầu làm phần đó.
  */
 import { z } from "zod";
+import { BOTTOM_KEYS, GENDERS, HAT_KEYS, TOP_KEYS } from "./characters";
 import { ROLES, STAFF_ROLES } from "./roles";
 import { USERNAME_PATTERN, USERNAME_RULE } from "./slug";
 
@@ -39,18 +40,41 @@ export type HealthResponse = z.infer<typeof HealthResponse>;
 /** Quy tắc tên nhân vật: xem USERNAME_PATTERN trong slug.ts. */
 export { USERNAME_PATTERN, USERNAME_RULE };
 
+/** Ngoại hình nhân vật: nam / nữ + 3 món đồ (xem HATS, TOPS, BOTTOMS trong characters.ts). */
+export const CharacterAppearance = z.strictObject({
+  gender: z.enum(GENDERS),
+  hat: z.enum(HAT_KEYS),
+  top: z.enum(TOP_KEYS),
+  bottom: z.enum(BOTTOM_KEYS),
+});
+
 export const MeResponse = z.object({
   id: z.string(),
   email: z.string().nullable(),
   /** Tên nhân vật (null nếu chưa đặt). */
   username: z.string().nullable(),
   role: z.enum(ROLES),
+  /** Ngoại hình nhân vật đã phối; null = chưa chọn, game mở màn chọn nhân vật. */
+  appearance: CharacterAppearance.nullable(),
+  /** Vùng đất (ngôn ngữ) đang chọn; null = chưa chọn, game mở màn chọn vùng đất. */
+  landId: z.string().nullable(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;
 
-export const UpdateMeRequest = z.object({
-  username: z.string().trim().regex(USERNAME_PATTERN, { error: USERNAME_RULE }),
-});
+const Username = z.string().trim().regex(USERNAME_PATTERN, { error: USERNAME_RULE });
+
+/** Đổi tên nhân vật, ngoại hình và / hoặc vùng đất đang chọn. Gửi ít nhất 1 trường. */
+export const UpdateMeRequest = z
+  .object({
+    username: Username.optional(),
+    appearance: CharacterAppearance.optional(),
+    /** Id vùng đất muốn vào (phải đang bật). */
+    landId: z.uuid().optional(),
+  })
+  .refine(
+    (body) => body.username !== undefined || body.appearance !== undefined || body.landId !== undefined,
+    { error: "Gửi username, appearance hoặc landId" },
+  );
 export type UpdateMeRequest = z.infer<typeof UpdateMeRequest>;
 
 // -----------------------------------------------------------------------------
@@ -168,7 +192,7 @@ export const AdminBanRequest = AdminReasonRequest.extend({
 });
 export type AdminBanRequest = z.input<typeof AdminBanRequest>;
 
-export const AdminRenamePlayerRequest = UpdateMeRequest;
+export const AdminRenamePlayerRequest = z.object({ username: Username });
 export type AdminRenamePlayerRequest = z.infer<typeof AdminRenamePlayerRequest>;
 
 /** Kết quả mỗi thao tác: thông báo + tài khoản sau khi đổi (xóa thì player = null). */

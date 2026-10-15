@@ -725,6 +725,24 @@ body {
     0 10px 18px -6px rgba(40, 18, 4, 0.6),
     inset 0 2px 0 rgba(255, 228, 180, 0.55);
 }
+/* Bảng vùng đất đang ở: bấm được (mở màn chọn vùng đất), rê chuột thì nổi lên. */
+.hud-land {
+  padding: 0.35rem 0.9rem;
+  transition:
+    transform 0.1s ease-out,
+    filter 0.15s;
+}
+.hud-land:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+.hud-land:active {
+  transform: translateY(3px);
+}
+.hud-land:focus-visible {
+  outline: 3px solid #fde68a;
+  outline-offset: 2px;
+}
 /* Bảng menu dùng nền gỗ của .hud-plate nhưng xếp dọc, các mục giãn hết chiều ngang. */
 .hud-menu {
   flex-direction: column;
@@ -836,6 +854,258 @@ body {
   }
 }
 
+/* -----------------------------------------------------------------------------
+ * Màn chọn nhân vật (/character).
+ * -------------------------------------------------------------------------- */
+
+/* Tiêu đề trên đảo 3D: chữ trắng khối dày như chữ trang chủ. */
+.char-title {
+  text-shadow:
+    0 2px 0 #2f6db3,
+    0 4px 0 #24558c,
+    0 6px 0 #1b406a,
+    0 10px 14px rgba(10, 30, 60, 0.45);
+}
+
+/* Bảng tên nhân vật đang chọn, giữa 2 nút mũi tên. */
+.char-plate {
+  min-width: 9.5rem;
+  border-radius: 0.9rem;
+  padding: 0.55rem 1.1rem;
+  text-align: center;
+  color: #5a2f0c;
+  background: linear-gradient(180deg, #fff3dc, #f6dcae);
+  border: 2px solid #4a2a10;
+  box-shadow:
+    0 5px 0 #5a2f0c,
+    0 10px 16px -6px rgba(40, 18, 4, 0.65),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* Thẻ nhân vật: miếng giấy da dày, chọn thì nổi lên và có viền vàng. */
+.char-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  border-radius: 1rem;
+  padding: 0.55rem 0.35rem 0.6rem;
+  text-align: center;
+  background: linear-gradient(180deg, #fff3dc, #f3d9ab);
+  border: 2px solid #6b3d17;
+  box-shadow:
+    0 4px 0 #6b3d17,
+    inset 0 2px 0 rgba(255, 255, 255, 0.65);
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out,
+    background 0.2s;
+}
+.char-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 #6b3d17,
+    inset 0 2px 0 rgba(255, 255, 255, 0.65);
+}
+.char-card:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 1px 0 #6b3d17,
+    inset 0 2px 0 rgba(255, 255, 255, 0.65);
+}
+.char-card:focus-visible {
+  outline: 3px solid #fde68a;
+  outline-offset: 2px;
+}
+.char-card-active {
+  background: linear-gradient(180deg, #fffbe9, #ffe49a);
+  border-color: #b7791f;
+  box-shadow:
+    0 4px 0 #8a5a14,
+    0 0 0 3px #fcd34d,
+    0 0 18px 2px rgba(253, 224, 71, 0.75),
+    inset 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+.char-card-active:hover {
+  box-shadow:
+    0 6px 0 #8a5a14,
+    0 0 0 3px #fcd34d,
+    0 0 18px 2px rgba(253, 224, 71, 0.75),
+    inset 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+.char-card-active .part-swatch {
+  animation: char-hop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes char-hop {
+  40% {
+    transform: translateY(-5px) scale(1.1);
+  }
+}
+
+/* Nút Nam / Nữ: thẻ nằm ngang, icon + chữ. */
+.char-gender {
+  flex-direction: row;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.5rem;
+}
+
+/* Ô màu của món đồ: viên đá đa giác màu chính, có vạch màu phụ chéo qua. */
+.part-swatch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  margin-bottom: 0.15rem;
+  clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.5) 0 22%, transparent 22% 60%, rgba(0, 0, 0, 0.18) 60%),
+    linear-gradient(160deg, transparent 0 52%, var(--a) 52% 68%, transparent 68%), var(--c);
+}
+.part-swatch-none {
+  background: linear-gradient(180deg, #f3e3c7, #e2cba5);
+}
+
+/* Điện thoại: bảng gỗ nằm dưới đảo 3D, bỏ dây treo để dây không cắt ngang nhân vật. */
+@media (max-width: 1023px) {
+  .char-board .wood-rope {
+    display: none;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+ * Màn chọn vùng đất (/lands): thẻ dọc như tấm bưu thiếp, khung gỗ dày.
+ * -------------------------------------------------------------------------- */
+.land-card-wrap {
+  width: calc(50% - 0.5rem);
+  max-width: 15rem;
+}
+@media (min-width: 768px) {
+  .land-card-wrap {
+    width: 14rem;
+  }
+}
+.land-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 1.25rem;
+  padding: 0.45rem;
+  text-align: left;
+  background:
+    linear-gradient(125deg, rgba(255, 236, 200, 0.28) 0 26%, transparent 26% 60%, rgba(70, 30, 5, 0.12) 60%),
+    linear-gradient(180deg, #d49650, #a8682d);
+  border: 2px solid #4a2a10;
+  box-shadow:
+    0 6px 0 #5a2f0c,
+    0 14px 22px -8px rgba(20, 10, 2, 0.7),
+    inset 0 2px 0 rgba(255, 228, 180, 0.6);
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1),
+    box-shadow 0.18s ease-out;
+}
+.land-card:hover {
+  transform: translateY(-4px) rotate(-0.6deg);
+}
+.land-card:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 2px 0 #5a2f0c,
+    0 6px 12px -6px rgba(20, 10, 2, 0.7),
+    inset 0 2px 0 rgba(255, 228, 180, 0.6);
+}
+.land-card:focus-visible {
+  outline: 3px solid #fde68a;
+  outline-offset: 3px;
+}
+.land-card-active {
+  transform: translateY(-8px) scale(1.03);
+  border-color: #b7791f;
+  box-shadow:
+    0 8px 0 #8a5a14,
+    0 0 0 4px #fcd34d,
+    0 0 30px 6px rgba(253, 224, 71, 0.65),
+    0 20px 30px -10px rgba(20, 10, 2, 0.7);
+}
+.land-card-active:hover {
+  transform: translateY(-10px) scale(1.03);
+}
+.land-card-photo {
+  position: absolute;
+  inset: 0.45rem;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: linear-gradient(160deg, #7cc0e8, #3f7fb5);
+  box-shadow: inset 0 0 0 2px rgba(60, 30, 10, 0.5);
+}
+.land-card-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.15) 0%,
+    transparent 30%,
+    transparent 45%,
+    rgba(10, 20, 40, 0.85) 100%
+  );
+}
+.land-card-body {
+  position: absolute;
+  left: 1.1rem;
+  right: 1.1rem;
+  bottom: 1rem;
+}
+/* Mã ngôn ngữ: con tem nhỏ góc trên. */
+.land-code {
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 0.6rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.85rem;
+  color: #5a2f0c;
+  background: linear-gradient(180deg, #fff3dc, #f6dcae);
+  border: 2px solid #4a2a10;
+  box-shadow: 0 3px 0 #5a2f0c;
+}
+.land-check {
+  position: absolute;
+  right: 0.9rem;
+  top: 0.9rem;
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #fff;
+  background: linear-gradient(180deg, #4ade80, #16a34a);
+  border: 2px solid #14532d;
+  box-shadow: 0 3px 0 #14532d;
+  animation: land-check-pop 0.35s cubic-bezier(0.34, 1.6, 0.64, 1);
+}
+@keyframes land-check-pop {
+  from {
+    transform: scale(0);
+  }
+}
+.land-empty {
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  background: linear-gradient(180deg, #fff3dc, #f3d9ab);
+  border: 2px solid #6b3d17;
+  box-shadow: 0 6px 0 #6b3d17;
+}
+/* Nút "Lên đường" luôn nằm cuối màn hình khi danh sách dài phải cuộn. */
+.land-confirm {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
 /* Người dùng bật "giảm chuyển động": tắt hết, chỉ giữ hình tĩnh. */
 @media (prefers-reduced-motion: reduce) {
   .home-parallax,
@@ -851,7 +1121,9 @@ body {
   .led-wait,
   .sign-flip,
   .tab-slide-next,
-  .tab-slide-prev {
+  .tab-slide-prev,
+  .char-card-active .part-swatch,
+  .land-check {
     animation: none;
     transition: none;
     transform: none;
