@@ -11,6 +11,7 @@ import { env } from "./env.js";
 import { ApiError, errorJson, Messages, messageForStatus } from "./lib/errors.js";
 import { openApiDocument } from "./openapi.js";
 import { adminRoutes } from "./routes/admin.js";
+import { authRoutes } from "./routes/auth.js";
 import { healthRoutes } from "./routes/health.js";
 import { meRoutes } from "./routes/me.js";
 
@@ -44,6 +45,7 @@ export function createApp(allowedOrigins: string[] = env.CORS_ORIGINS, docs: boo
 
   // 4. Các route.
   app.route("/health", healthRoutes);
+  app.route("/auth", authRoutes);
   app.route("/me", meRoutes);
   app.route("/admin", adminRoutes);
 

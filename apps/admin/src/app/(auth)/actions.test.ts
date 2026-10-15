@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { USERNAME_RULE } from "@lw/shared";
 import { createClient } from "@/lib/supabase/server";
 import { signUp } from "./actions";
 
@@ -41,7 +42,8 @@ beforeEach(() => {
 describe("server action signUp", () => {
   it.each([
     [{ email: "khong-phai-email" }, "Email không hợp lệ"],
-    [{ username: "ab" }, "Tên hiển thị gồm 3–32 chữ, số, dấu _ . -"],
+    [{ username: "ab" }, USERNAME_RULE],
+    [{ username: "KhongDacBiet" }, USERNAME_RULE],
     [{ password: "ngan", confirmPassword: "ngan" }, "Mật khẩu tối thiểu 8 ký tự"],
     [{ confirmPassword: "khac-hoan-toan" }, "Mật khẩu nhập lại không khớp"],
   ])("kiểm tra dữ liệu %j trước khi gọi Supabase", async (overrides, message) => {

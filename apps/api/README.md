@@ -41,6 +41,7 @@ cách API kiểm tra dữ liệu. Thêm route mới thì thêm 1 dòng vào `ROU
 | `SUPABASE_URL`              | (trống)                                       | Thiếu thì route cần đăng nhập trả 503            |
 | `SUPABASE_SERVICE_ROLE_KEY` | (trống)                                       | **KHÓA BÍ MẬT**, không bao giờ đưa vào web/admin |
 | `CORS_ORIGINS`              | `http://localhost:3000,http://localhost:3001` | Các trang web được phép gọi API                  |
+| `WEB_URL`                   | `http://localhost:3000`                       | Địa chỉ web game, dùng cho link trong email      |
 | `API_DOCS`                  | `true`                                        | `false` để tắt `/api-docs` và `/openapi.json`    |
 
 Khi thiếu Supabase, máy chủ vẫn chạy và in cảnh báo; các route cần đăng nhập trả
@@ -48,13 +49,22 @@ Khi thiếu Supabase, máy chủ vẫn chạy và in cảnh báo; các route c�
 
 ## Danh sách route
 
-| Route               | Đăng nhập | Việc làm                                           |
-| ------------------- | --------- | -------------------------------------------------- |
-| `GET /api-docs`     | không     | Swagger UI (tắt bằng `API_DOCS=false`)             |
-| `GET /openapi.json` | không     | Đặc tả OpenAPI 3.1                                 |
-| `GET /health`       | không     | `{ ok: true, service: "api", time }`               |
-| `GET /me`           | có        | `{ id, email }` của người đang đăng nhập           |
-| `GET /admin/me`     | nhân viên | `{ id, email, role }` của nhân viên đang đăng nhập |
+| Route                                    | Đăng nhập        | Việc làm                                                           |
+| ---------------------------------------- | ---------------- | ------------------------------------------------------------------ |
+| `GET /api-docs`                          | không            | Swagger UI (tắt bằng `API_DOCS=false`)                             |
+| `GET /openapi.json`                      | không            | Đặc tả OpenAPI 3.1                                                 |
+| `GET /health`                            | không            | `{ ok: true, service: "api", time }`                               |
+| `GET /me`                                | có               | `{ id, email, username, role }` của người đang đăng nhập           |
+| `PATCH /me`                              | có               | Đổi tên nhân vật `{ username }` (trùng tên: 409)                   |
+| `GET /admin/me`                          | nhân viên        | `{ id, email, role }` của nhân viên đang đăng nhập                 |
+| `GET /admin/players`                     | admin, moderator | Danh sách tài khoản: tìm kiếm, lọc trạng thái, phân trang, số liệu |
+| `GET /admin/players/:id`                 | admin, moderator | Chi tiết một tài khoản                                             |
+| `POST /admin/players/:id/confirm-email`  | admin            | Xác nhận email thay người chơi                                     |
+| `POST /admin/players/:id/password-reset` | admin            | Gửi email đặt lại mật khẩu (link về `WEB_URL`)                     |
+| `POST /admin/players/:id/ban`            | admin            | Khóa `{ reason, days }` (days = null: vô thời hạn)                 |
+| `POST /admin/players/:id/unban`          | admin            | Mở khóa `{ reason }`                                               |
+| `PATCH /admin/players/:id`               | admin            | Đổi tên nhân vật `{ username }`                                    |
+| `DELETE /admin/players/:id`              | admin            | Xóa vĩnh viễn `{ reason }`                                         |
 
 Mọi lỗi đều có dạng `{ "error": "<thông báo tiếng Việt>" }`:
 

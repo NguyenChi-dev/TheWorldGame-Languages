@@ -67,8 +67,27 @@ vi.mock("../lib/supabase", () => ({
         eq: (_column: string, id: string) => ({
           maybeSingle: async () => ({
             data:
-              table === "profiles" ? { role: Object.values(USERS).find((u) => u.sub === id)?.role } : null,
+              table === "profiles"
+                ? { role: Object.values(USERS).find((u) => u.sub === id)?.role, username: "Mèo_Ú" }
+                : null,
             error: null,
+          }),
+        }),
+      }),
+      // profiles.update({ username }).eq("id", ...).select().maybeSingle(): tên "Trùng_Tên" giả lập trùng.
+      update: (values: { username: string }) => ({
+        eq: (_column: string, id: string) => ({
+          select: () => ({
+            maybeSingle: async () =>
+              values.username === "Trùng_Tên"
+                ? { data: null, error: { code: "23505", message: "duplicate key" } }
+                : {
+                    data: {
+                      username: values.username,
+                      role: Object.values(USERS).find((u) => u.sub === id)?.role,
+                    },
+                    error: null,
+                  },
           }),
         }),
       }),
@@ -86,10 +105,15 @@ const asUser = (token: string, init: RequestInit = {}) => ({
 beforeEach(() => vi.spyOn(console, "error").mockImplementation(() => {}));
 
 describe("GET /me", () => {
-  it("trả về id và email lấy từ token", async () => {
+  it("trả về id, email (từ token) và tên nhân vật, vai trò (từ database)", async () => {
     const res = await app.request("/me", asUser(PLAYER_TOKEN));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id: USERS[PLAYER_TOKEN].sub, email: "an@example.com" });
+    expect(await res.json()).toEqual({
+      id: USERS[PLAYER_TOKEN].sub,
+      email: "an@example.com",
+      username: "Mèo_Ú",
+      role: "player",
+    });
   });
 
   it("token sai trả 401", async () => {
@@ -100,6 +124,43 @@ describe("GET /me", () => {
 
   it("token rác làm Supabase ném lỗi vẫn trả 401, không phải 500", async () => {
     const res = await app.request("/me", asUser("token-lam-hong"));
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("PATCH /me", () => {
+  const patch = (token: string, body: unknown) =>
+    app.request("/me", asUser(token, { method: "PATCH", body: JSON.stringify(body) }));
+
+  it("đổi tên nhân vật của chính mình", async () => {
+    const res = await patch(PLAYER_TOKEN, { username: "  Mèo_Mập " });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      id: USERS[PLAYER_TOKEN].sub,
+      username: "Mèo_Mập",
+      role: "player",
+    });
+  });
+
+  it("tên sai định dạng: 400 nêu tên trường", async () => {
+    const res = await patch(PLAYER_TOKEN, { username: "a b" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Dữ liệu gửi lên không hợp lệ: username" });
+  });
+
+  it("trùng tên: 409", async () => {
+    const res = await patch(PLAYER_TOKEN, { username: "Trùng_Tên" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Tên nhân vật này đã có người dùng" });
+  });
+
+  it("gửi kèm role cũng không đổi được vai trò (chỉ nhận username)", async () => {
+    const res = await patch(PLAYER_TOKEN, { username: "Mèo_Mới", role: "admin" });
+    expect(((await res.json()) as { role: string }).role).toBe("player");
+  });
+
+  it("chưa đăng nhập: 401", async () => {
+    const res = await app.request("/me", { method: "PATCH", body: "{}" });
     expect(res.status).toBe(401);
   });
 });

@@ -8,13 +8,29 @@
  * có route trong app mà chưa có trong tài liệu (hoặc ngược lại).
  */
 import { z } from "zod";
-import { AdminMeResponse, ErrorResponse, HealthResponse, MeResponse } from "@lw/shared/api";
+import {
+  AdminBanRequest,
+  AdminMeResponse,
+  AdminPlayer,
+  AdminPlayerActionResponse,
+  AdminPlayerParams,
+  AdminPlayersQuery,
+  AdminPlayersResponse,
+  AdminReasonRequest,
+  AdminRenamePlayerRequest,
+  ErrorResponse,
+  HealthResponse,
+  MeResponse,
+  SignUpRequest,
+  SignUpResponse,
+  UpdateMeRequest,
+} from "@lw/shared/api";
 
 /** Ai được gọi route: không cần đăng nhập, người đã đăng nhập, hay nhân viên (admin/editor/moderator + TOTP). */
 type Access = "public" | "user" | "staff";
 
 interface RouteDoc {
-  method: "get" | "post";
+  method: "get" | "post" | "patch" | "delete";
   /** Đường dẫn kiểu OpenAPI: tham số viết {id}, không phải :id. */
   path: string;
   tag: string;
@@ -27,13 +43,116 @@ interface RouteDoc {
   response: z.ZodType;
   /** Route mới có khung, hiện luôn trả 501. */
   notImplemented?: boolean;
+  /** Lỗi riêng của route, ví dụ { 409: "Trùng tên" }. */
+  extraErrors?: Record<number, string>;
+  /** Ghi chú quyền riêng (mặc định theo access). */
+  accessNote?: string;
 }
 
 const TAGS = {
   system: "Hệ thống",
   account: "Tài khoản",
   admin: "Quản trị",
+  players: "Quản trị · Người chơi",
 } as const;
+
+const ADMIN_ONLY = "Chỉ admin. Ghi nhật ký admin_logs. Không thao tác được trên chính mình.";
+const NOT_FOUND = { 404: "Không tìm thấy tài khoản" };
+
+/** Các route quản lý tài khoản người chơi (src/routes/admin-players.ts). */
+const PLAYER_ROUTES: RouteDoc[] = [
+  {
+    method: "get",
+    path: "/admin/players",
+    tag: TAGS.players,
+    summary: "Danh sách tài khoản (tìm kiếm, lọc, phân trang) + số liệu",
+    accessNote: "Admin và moderator.",
+    access: "staff",
+    query: AdminPlayersQuery,
+    response: AdminPlayersResponse,
+  },
+  {
+    method: "get",
+    path: "/admin/players/{id}",
+    tag: TAGS.players,
+    summary: "Chi tiết một tài khoản",
+    accessNote: "Admin và moderator.",
+    access: "staff",
+    params: AdminPlayerParams,
+    response: AdminPlayer,
+    extraErrors: NOT_FOUND,
+  },
+  {
+    method: "post",
+    path: "/admin/players/{id}/confirm-email",
+    tag: TAGS.players,
+    summary: "Xác nhận email thay người chơi",
+    accessNote: ADMIN_ONLY,
+    access: "staff",
+    params: AdminPlayerParams,
+    response: AdminPlayerActionResponse,
+    extraErrors: { ...NOT_FOUND, 409: "Email đã được xác nhận" },
+  },
+  {
+    method: "post",
+    path: "/admin/players/{id}/password-reset",
+    tag: TAGS.players,
+    summary: "Gửi email đặt lại mật khẩu",
+    accessNote: ADMIN_ONLY,
+    access: "staff",
+    params: AdminPlayerParams,
+    response: AdminPlayerActionResponse,
+    extraErrors: { ...NOT_FOUND, 429: "Gửi email quá nhiều lần" },
+  },
+  {
+    method: "post",
+    path: "/admin/players/{id}/ban",
+    tag: TAGS.players,
+    summary: "Khóa tài khoản (days = null: vô thời hạn)",
+    accessNote: `${ADMIN_ONLY} Chỉ khóa được tài khoản người chơi.`,
+    access: "staff",
+    params: AdminPlayerParams,
+    body: AdminBanRequest,
+    response: AdminPlayerActionResponse,
+    extraErrors: NOT_FOUND,
+  },
+  {
+    method: "post",
+    path: "/admin/players/{id}/unban",
+    tag: TAGS.players,
+    summary: "Mở khóa tài khoản",
+    accessNote: ADMIN_ONLY,
+    access: "staff",
+    params: AdminPlayerParams,
+    body: AdminReasonRequest,
+    response: AdminPlayerActionResponse,
+    extraErrors: { ...NOT_FOUND, 409: "Tài khoản không bị khóa" },
+  },
+  {
+    method: "patch",
+    path: "/admin/players/{id}",
+    tag: TAGS.players,
+    summary: "Đổi tên nhân vật",
+    accessNote: ADMIN_ONLY,
+    access: "staff",
+    params: AdminPlayerParams,
+    body: AdminRenamePlayerRequest,
+    response: AdminPlayerActionResponse,
+    extraErrors: { ...NOT_FOUND, 409: "Tên nhân vật đã có người dùng" },
+  },
+  {
+    method: "delete",
+    path: "/admin/players/{id}",
+    tag: TAGS.players,
+    summary: "Xóa vĩnh viễn tài khoản",
+    accessNote: `${ADMIN_ONLY} Chỉ xóa được tài khoản người chơi.`,
+    access: "staff",
+    params: AdminPlayerParams,
+    body: AdminReasonRequest,
+    response: AdminPlayerActionResponse,
+    extraErrors: NOT_FOUND,
+  },
+];
 
 export const ROUTES: RouteDoc[] = [
   {
@@ -45,12 +164,40 @@ export const ROUTES: RouteDoc[] = [
     response: HealthResponse,
   },
   {
+    method: "post",
+    path: "/auth/signup",
+    tag: TAGS.account,
+    summary: "Tạo tài khoản người chơi (đã xác nhận sẵn, không gửi email)",
+    description:
+      "Tên nhân vật kiểm tra trùng trước. Vai trò luôn là player. Giới hạn 10 lần / 10 phút mỗi IP. " +
+      "Tạo xong thì đăng nhập bằng email + mật khẩu như bình thường.",
+    access: "public",
+    body: SignUpRequest,
+    response: SignUpResponse,
+    extraErrors: {
+      409: "Email đã có tài khoản / tên nhân vật đã có người dùng",
+      429: "Tạo tài khoản quá nhiều lần",
+    },
+  },
+  {
     method: "get",
     path: "/me",
     tag: TAGS.account,
-    summary: "Người đang đăng nhập",
+    summary: "Hồ sơ người đang đăng nhập",
+    description: "id, email lấy từ token; tên nhân vật và vai trò đọc từ bảng profiles.",
     access: "user",
     response: MeResponse,
+  },
+  {
+    method: "patch",
+    path: "/me",
+    tag: TAGS.account,
+    summary: "Đổi tên nhân vật",
+    description: "Chỉ đổi tên của chính mình. Trùng tên (không phân biệt hoa thường) trả 409.",
+    access: "user",
+    body: UpdateMeRequest,
+    response: MeResponse,
+    extraErrors: { 409: "Tên nhân vật đã có người dùng" },
   },
   {
     method: "get",
@@ -60,6 +207,7 @@ export const ROUTES: RouteDoc[] = [
     access: "staff",
     response: AdminMeResponse,
   },
+  ...PLAYER_ROUTES,
 ];
 
 // -----------------------------------------------------------------------------
@@ -105,12 +253,16 @@ function toOperation(route: RouteDoc) {
     responses[403] = error("Không phải nhân viên, hoặc token chưa qua xác thực hai lớp (TOTP)");
   }
   if (route.notImplemented) responses[501] = error("Route mới có khung, chưa làm");
+  for (const [status, description] of Object.entries(route.extraErrors ?? {}))
+    responses[status] = error(description);
 
-  const accessNote = {
-    public: "Không cần đăng nhập.",
-    user: "Cần đăng nhập (Bearer token).",
-    staff: "Chỉ nhân viên (admin, editor, moderator) với token đã qua xác thực hai lớp (aal2).",
-  }[route.access];
+  const accessNote =
+    route.accessNote ??
+    {
+      public: "Không cần đăng nhập.",
+      user: "Cần đăng nhập (Bearer token).",
+      staff: "Chỉ nhân viên (admin, editor, moderator) với token đã qua xác thực hai lớp (aal2).",
+    }[route.access];
 
   return {
     tags: [route.tag],

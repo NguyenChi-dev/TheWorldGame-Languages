@@ -5,7 +5,9 @@ import {
   faEnvelope,
   faEye,
   faEyeSlash,
+  faKey,
   faLock,
+  faPaperPlane,
   faRightToBracket,
   faTriangleExclamation,
   faUser,
@@ -14,11 +16,13 @@ import {
   type IconDefinition,
 } from "@fortawesome/free-solid-svg-icons";
 import { useActionState, useId, useLayoutEffect, useRef, useState } from "react";
-import { signIn, signUp } from "@/app/(world)/login/actions";
+import { requestPasswordReset, resendConfirmation, signIn, signUp } from "@/app/(world)/login/actions";
 import { FaIcon } from "@/components/fa-icon";
 import type { ActionState } from "@/lib/action-state";
 
 type Tab = "signin" | "signup";
+/** Màn hình đang mở trên bảng gỗ: 2 tab + màn "Quên mật khẩu" (mở từ tab Đăng nhập). */
+export type AuthView = Tab | "forgot";
 
 const TABS: { key: Tab; label: string; icon: IconDefinition }[] = [
   { key: "signin", label: "Đăng nhập", icon: faRightToBracket },
@@ -29,7 +33,7 @@ const TABS: { key: Tab; label: string; icon: IconDefinition }[] = [
  * Ô nhập trên bảng gỗ: nhãn chữ khắc sáng, ô nền giấy da có icon bên trái.
  * Ô mật khẩu có nút con mắt để hiện / ẩn mật khẩu.
  */
-function WoodField({
+export function WoodField({
   label,
   name,
   icon,
@@ -94,7 +98,7 @@ function WoodField({
 }
 
 /** Dải thông báo trên bảng gỗ (lỗi đỏ / thành công xanh), có icon. */
-function Notice({ tone, children }: { tone: "error" | "success"; children: string }) {
+export function Notice({ tone, children }: { tone: "error" | "success"; children: string }) {
   return (
     <p
       role={tone === "error" ? "alert" : "status"}
@@ -110,7 +114,7 @@ function Notice({ tone, children }: { tone: "error" | "success"; children: strin
   );
 }
 
-function SubmitButton({
+export function SubmitButton({
   pending,
   icon,
   children,
@@ -133,38 +137,80 @@ function SubmitButton({
   );
 }
 
-function SignInForm() {
+/** Nút chữ nhỏ "Gửi lại email xác nhận" (email gửi kèm trong ô ẩn). */
+function ResendConfirmation({ email }: { email: string }) {
+  const [state, action, pending] = useActionState<ActionState, FormData>(resendConfirmation, {});
+  if (state.message) return <Notice tone="success">{state.message}</Notice>;
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="email" value={email} />
+      {state.error ? <Notice tone="error">{state.error}</Notice> : null}
+      <button
+        type="submit"
+        disabled={pending}
+        className="wood-label flex w-full items-center justify-center gap-2 font-game text-sm font-bold text-amber-200 underline decoration-2 underline-offset-4 hover:text-white disabled:opacity-60"
+      >
+        <FaIcon icon={faPaperPlane} />
+        {pending ? "Đang gửi..." : "Gửi lại email xác nhận"}
+      </button>
+    </form>
+  );
+}
+
+function SignInForm({ onForgot }: { onForgot: () => void }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(signIn, {});
   return (
-    <form action={action} className="space-y-3.5">
-      <WoodField
-        label="Email"
-        name="email"
-        icon={faEnvelope}
-        type="email"
-        autoComplete="email"
-        placeholder="ban@vidu.com"
-        defaultValue={state.values?.email}
-      />
-      <WoodField
-        label="Mật khẩu"
-        name="password"
-        icon={faLock}
-        type="password"
-        autoComplete="current-password"
-        placeholder="Nhập mật khẩu"
-      />
-      {state.error ? <Notice tone="error">{state.error}</Notice> : null}
-      <SubmitButton pending={pending} icon={faRightToBracket}>
-        Vào game
-      </SubmitButton>
-    </form>
+    <div className="space-y-3">
+      <form action={action} className="space-y-3.5">
+        <WoodField
+          label="Email"
+          name="email"
+          icon={faEnvelope}
+          type="email"
+          autoComplete="email"
+          placeholder="ban@vidu.com"
+          defaultValue={state.values?.email}
+        />
+        <div>
+          <WoodField
+            label="Mật khẩu"
+            name="password"
+            icon={faLock}
+            type="password"
+            autoComplete="current-password"
+            placeholder="Nhập mật khẩu"
+          />
+          <button
+            type="button"
+            onClick={onForgot}
+            className="wood-label mt-1.5 ml-auto flex items-center gap-1.5 font-game text-xs font-bold hover:text-white"
+          >
+            <FaIcon icon={faKey} />
+            Quên mật khẩu?
+          </button>
+        </div>
+        {state.error ? <Notice tone="error">{state.error}</Notice> : null}
+        <SubmitButton pending={pending} icon={faRightToBracket}>
+          Vào game
+        </SubmitButton>
+      </form>
+      {state.code === "email_not_confirmed" && state.values?.email ? (
+        <ResendConfirmation email={state.values.email} />
+      ) : null}
+    </div>
   );
 }
 
 function SignUpForm() {
   const [state, action, pending] = useActionState<ActionState, FormData>(signUp, {});
-  if (state.message) return <Notice tone="success">{state.message}</Notice>;
+  if (state.message) {
+    return (
+      <div className="space-y-3">
+        <Notice tone="success">{state.message}</Notice>
+        {state.values?.email ? <ResendConfirmation email={state.values.email} /> : null}
+      </div>
+    );
+  }
   return (
     <form action={action} className="space-y-3">
       <WoodField
@@ -214,6 +260,29 @@ function SignUpForm() {
   );
 }
 
+/** Quên mật khẩu: nhập email, nhận link đặt mật khẩu mới. */
+function ForgotForm() {
+  const [state, action, pending] = useActionState<ActionState, FormData>(requestPasswordReset, {});
+  if (state.message) return <Notice tone="success">{state.message}</Notice>;
+  return (
+    <form action={action} className="space-y-3.5">
+      <WoodField
+        label="Email đã đăng ký"
+        name="email"
+        icon={faEnvelope}
+        type="email"
+        autoComplete="email"
+        placeholder="ban@vidu.com"
+        defaultValue={state.values?.email}
+      />
+      {state.error ? <Notice tone="error">{state.error}</Notice> : null}
+      <SubmitButton pending={pending} icon={faPaperPlane}>
+        Gửi email
+      </SubmitButton>
+    </form>
+  );
+}
+
 /**
  * Nội dung bảng gỗ ở trang /login: tiêu đề khắc gỗ, 2 tab Đăng nhập / Tạo tài khoản, form tương ứng.
  * Hiệu ứng đổi tab:
@@ -222,8 +291,8 @@ function SignUpForm() {
  *   - form mới trượt vào theo hướng của tab, khung co giãn chiều cao mượt (form tạo tài khoản dài hơn).
  * Lần đầu mở trang không chạy hiệu ứng đổi tab (bảng gỗ đã có hiệu ứng rơi xuống).
  */
-export function AuthPanel({ initialTab, notice }: { initialTab: Tab; notice: string | null }) {
-  const [tab, setTab] = useState<Tab>(initialTab);
+export function AuthPanel({ initialTab, notice }: { initialTab: AuthView; notice: string | null }) {
+  const [tab, setTab] = useState<AuthView>(initialTab);
   /** Hướng chuyển tab gần nhất (null = chưa đổi lần nào). */
   const [direction, setDirection] = useState<"next" | "prev" | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -238,12 +307,18 @@ export function AuthPanel({ initialTab, notice }: { initialTab: Tab; notice: str
     return () => observer.disconnect();
   }, []);
 
-  function choose(next: Tab) {
+  function choose(next: AuthView) {
     if (next === tab) return;
-    setDirection(next === "signup" ? "next" : "prev");
+    setDirection(next === "signin" ? "prev" : "next");
     setTab(next);
-    window.history.replaceState(null, "", next === "signup" ? "/login?tab=signup" : "/login");
+    window.history.replaceState(null, "", next === "signin" ? "/login" : `/login?tab=${next}`);
   }
+
+  const heading = {
+    signin: { title: "Chào lữ khách!", sub: "Đăng nhập để tiếp tục hành trình học ngôn ngữ." },
+    signup: { title: "Gia nhập thế giới", sub: "Tạo nhân vật và bắt đầu du hành qua các vùng đất." },
+    forgot: { title: "Quên mật khẩu?", sub: "Nhập email, chúng tôi gửi link để đặt mật khẩu mới." },
+  }[tab];
 
   const slide = direction === "next" ? "tab-slide-next" : direction === "prev" ? "tab-slide-prev" : "";
 
@@ -254,35 +329,35 @@ export function AuthPanel({ initialTab, notice }: { initialTab: Tab; notice: str
           key={`title-${tab}`}
           className={`wood-carve font-poly text-[1.65rem] leading-tight sm:text-4xl ${direction ? "sign-flip" : ""}`}
         >
-          {tab === "signin" ? "Chào lữ khách!" : "Gia nhập thế giới"}
+          {heading.title}
         </h1>
         <p key={`sub-${tab}`} className={`wood-label mt-1 font-game text-sm font-semibold ${slide}`}>
-          {tab === "signin"
-            ? "Đăng nhập để tiếp tục hành trình học ngôn ngữ."
-            : "Tạo nhân vật và bắt đầu du hành qua các vùng đất."}
+          {heading.sub}
         </p>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Đăng nhập hoặc tạo tài khoản"
-        className="wood-tab-track grid grid-cols-2"
-      >
-        <span aria-hidden="true" data-tab={tab} className="wood-tab-indicator" />
-        {TABS.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.key}
-            onClick={() => choose(item.key)}
-            className="wood-tab flex items-center justify-center gap-2 rounded-xl py-2 font-poly text-sm sm:text-base"
-          >
-            <FaIcon icon={item.icon} className="text-xs sm:text-sm" />
-            {item.label}
-          </button>
-        ))}
-      </div>
+      {tab === "forgot" ? null : (
+        <div
+          role="tablist"
+          aria-label="Đăng nhập hoặc tạo tài khoản"
+          className="wood-tab-track grid grid-cols-2"
+        >
+          <span aria-hidden="true" data-tab={tab} className="wood-tab-indicator" />
+          {TABS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.key}
+              onClick={() => choose(item.key)}
+              className="wood-tab flex items-center justify-center gap-2 rounded-xl py-2 font-poly text-sm sm:text-base"
+            >
+              <FaIcon icon={item.icon} className="text-xs sm:text-sm" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {notice && tab === "signin" ? <Notice tone="error">{notice}</Notice> : null}
       {/* Khung ngoài cắt phần form đang trượt vào; px/-mx chừa chỗ cho viền sáng khi ô nhập được chọn. */}
@@ -293,13 +368,19 @@ export function AuthPanel({ initialTab, notice }: { initialTab: Tab; notice: str
       >
         <div ref={contentRef} className="pb-3 pt-1">
           <div key={tab} className={slide}>
-            {tab === "signin" ? <SignInForm /> : <SignUpForm />}
+            {tab === "signin" ? (
+              <SignInForm onForgot={() => choose("forgot")} />
+            ) : tab === "signup" ? (
+              <SignUpForm />
+            ) : (
+              <ForgotForm />
+            )}
           </div>
         </div>
       </div>
 
       <p className="wood-label -mt-2 text-center font-game text-sm font-semibold">
-        {tab === "signin" ? "Chưa có tài khoản? " : "Đã có tài khoản? "}
+        {tab === "signin" ? "Chưa có tài khoản? " : tab === "signup" ? "Đã có tài khoản? " : "Nhớ ra rồi? "}
         <button
           type="button"
           onClick={() => choose(tab === "signin" ? "signup" : "signin")}

@@ -39,7 +39,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
       <div className="relative my-auto w-full max-w-md">
         <WoodBoard>
           <AuthPanel
-            initialTab={tab === "signup" ? "signup" : "signin"}
+            initialTab={tab === "signup" || tab === "forgot" ? tab : "signin"}
             notice={confirmError ? "Link xác nhận không hợp lệ hoặc đã hết hạn. Hãy đăng nhập lại." : null}
           />
         </WoodBoard>

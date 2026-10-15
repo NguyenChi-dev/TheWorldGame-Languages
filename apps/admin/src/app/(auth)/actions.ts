@@ -7,7 +7,7 @@
  */
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { isRole, isStaffRole } from "@lw/shared";
+import { USERNAME_PATTERN, USERNAME_RULE, isRole, isStaffRole } from "@lw/shared";
 import type { ActionState } from "@/lib/action-state";
 import { getSession, readMfaRequired } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -49,7 +49,6 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USERNAME = /^[\p{L}\p{N}_.-]{3,32}$/u;
 const MIN_PASSWORD = 8;
 
 /**
@@ -60,13 +59,15 @@ export async function signUp(_prev: ActionState, formData: FormData): Promise<Ac
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
-  const username = String(formData.get("username") ?? "").trim();
+  // NFC: chữ có dấu luôn ở dạng dựng sẵn (1 ký tự), khớp kiểm tra của database.
+  const username = String(formData.get("username") ?? "")
+    .trim()
+    .normalize("NFC");
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirmPassword") ?? "");
 
   if (!EMAIL.test(email)) return { values: { email, username }, error: "Email không hợp lệ" };
-  if (!USERNAME.test(username))
-    return { values: { email, username }, error: "Tên hiển thị gồm 3–32 chữ, số, dấu _ . -" };
+  if (!USERNAME_PATTERN.test(username)) return { values: { email, username }, error: USERNAME_RULE };
   if (password.length < MIN_PASSWORD)
     return { values: { email, username }, error: `Mật khẩu tối thiểu ${MIN_PASSWORD} ký tự` };
   if (password !== confirm) return { values: { email, username }, error: "Mật khẩu nhập lại không khớp" };

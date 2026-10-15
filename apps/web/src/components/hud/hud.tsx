@@ -1,7 +1,15 @@
 "use client";
 
-import { faDoorOpen, faServer, faTowerBroadcast, faUser } from "@fortawesome/free-solid-svg-icons";
-import { signOut } from "@/app/(world)/login/actions";
+import {
+  faArrowRightFromBracket,
+  faDoorOpen,
+  faServer,
+  faTowerBroadcast,
+  faUser,
+  faUsersSlash,
+} from "@fortawesome/free-solid-svg-icons";
+import { useEffect, useRef, useState } from "react";
+import { signOut, signOutEverywhere } from "@/app/(world)/login/actions";
 import { FaIcon } from "@/components/fa-icon";
 import { useGameStore } from "@/store/game-store";
 import { useApiHealth } from "./use-api-health";
@@ -20,9 +28,65 @@ function StatusLight({ led, icon, label }: { led: Led; icon: typeof faServer; la
   );
 }
 
+/** Nút Thoát: mở bảng nhỏ chọn "Đăng xuất" (thiết bị này) hoặc "Đăng xuất mọi thiết bị". */
+function ExitMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Bấm ra ngoài hoặc nhấn Esc thì đóng.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: PointerEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const item =
+    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-game text-sm font-bold text-[#fff4dc] [text-shadow:0_1px_0_#4a2a10] transition hover:bg-black/15";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="hud-icon-btn text-lg"
+        aria-label="Thoát"
+        title="Thoát"
+      >
+        <FaIcon icon={faDoorOpen} />
+      </button>
+      {open ? (
+        <div role="menu" className="hud-plate hud-menu absolute left-0 top-full z-30 mt-3 w-60">
+          <form action={signOut}>
+            <button type="submit" role="menuitem" className={item}>
+              <FaIcon icon={faArrowRightFromBracket} fixedWidth />
+              Đăng xuất
+            </button>
+          </form>
+          <form action={signOutEverywhere}>
+            <button type="submit" role="menuitem" className={item}>
+              <FaIcon icon={faUsersSlash} fixedWidth />
+              Đăng xuất mọi thiết bị
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Giao diện đè lên game:
- *   - trái: tấm gỗ có huy hiệu + tên nhân vật, nút gỗ Thoát (đăng xuất);
+ *   - trái: tấm gỗ có huy hiệu + tên nhân vật, nút gỗ Thoát (đăng xuất / đăng xuất mọi thiết bị);
  *   - phải: đèn trạng thái máy chủ realtime (người online) và máy chủ API.
  */
 export function Hud({ playerName }: { playerName: string }) {
@@ -61,11 +125,7 @@ export function Hud({ playerName }: { playerName: string }) {
             </span>
           </span>
         </div>
-        <form action={signOut}>
-          <button type="submit" className="hud-icon-btn text-lg" aria-label="Thoát (đăng xuất)" title="Thoát">
-            <FaIcon icon={faDoorOpen} />
-          </button>
-        </form>
+        <ExitMenu />
       </div>
 
       <div className="flex flex-col items-end gap-2">

@@ -24,6 +24,10 @@ const EnvSchema = z.object({
   API_DOCS: z
     .preprocess(emptyToUndefined, z.enum(["true", "false"]).default("true"))
     .transform((value) => value === "true"),
+  // Địa chỉ web game, để tạo link trong email (đặt lại mật khẩu) gửi từ trang quản trị.
+  WEB_URL: z
+    .preprocess(emptyToUndefined, z.url({ protocol: /^https?$/ }).default("http://localhost:3000"))
+    .transform((value) => value.replace(/\/+$/, "")),
   CORS_ORIGINS: z
     .preprocess(emptyToUndefined, z.string().default("http://localhost:3000,http://localhost:3001"))
     .transform((value) =>

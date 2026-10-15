@@ -55,7 +55,7 @@ export function SignupForm() {
         required
         minLength={3}
         maxLength={32}
-        hint="3–32 ký tự: chữ, số, dấu _ . -"
+        hint="3–32 ký tự, không dấu cách, có ít nhất 1 ký tự đặc biệt (ví dụ _ ! @ #)"
       />
       {/* 2 ô mật khẩu nằm cạnh nhau để cả form vừa 1 khung, không phải cuộn. */}
       <div className="grid gap-4 sm:grid-cols-2 short:gap-3">
