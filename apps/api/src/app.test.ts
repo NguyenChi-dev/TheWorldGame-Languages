@@ -1,7 +1,6 @@
 // Test các route bằng app.request(): gọi thẳng vào app, không cần mở cổng 4000.
 // Supabase được cố ý để trống (xem vitest.config.ts).
 import { describe, expect, it } from "vitest";
-import { SEED_LIST } from "@lw/shared";
 import type { HealthResponse } from "@lw/shared/api";
 import { app } from "./app";
 
@@ -17,14 +16,6 @@ describe("GET /health", () => {
   });
 });
 
-describe("GET /catalog/seeds", () => {
-  it("trả về đúng danh sách hạt giống trong @lw/shared", async () => {
-    const res = await app.request("/catalog/seeds");
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ seeds: SEED_LIST });
-  });
-});
-
 describe("Đăng nhập", () => {
   it("GET /me không có token trả 401", async () => {
     const res = await app.request("/me");
@@ -32,8 +23,8 @@ describe("Đăng nhập", () => {
     expect(await res.json()).toEqual({ error: "Chưa đăng nhập" });
   });
 
-  it("route khung cũng đòi đăng nhập trước khi kiểm tra dữ liệu", async () => {
-    const res = await app.request("/farm/harvest", { method: "POST", body: "{}" });
+  it("route quản trị cũng đòi đăng nhập", async () => {
+    const res = await app.request("/admin/me");
     expect(res.status).toBe(401);
   });
 

@@ -1,12 +1,12 @@
 /**
- * Đọc vùng đất / khu vực / bài học cho các trang /lands/... (qua RLS, bằng phiên của người đang đăng nhập).
+ * Đọc vùng đất / khu vực / kỹ năng cho các trang /lands/... (qua RLS, bằng phiên của người đang đăng nhập).
  * Không tìm thấy (hoặc mã sai định dạng, hoặc khu vực không thuộc vùng đất này) thì trả trang 404.
  * Dùng React cache: layout, breadcrumb và trang trong cùng 1 request chỉ đọc 1 lần.
  */
 import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
-import { isAreaScene, isLessonStatus, isSkill, type Area, type Land, type Lesson } from "@lw/shared";
+import { isAreaScene, isSkillColorKey, isSkillIconKey, type Area, type Land, type Skill } from "@lw/shared";
 import { createClient } from "@/lib/supabase/server";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,32 +27,30 @@ export function toLand(row: Row): Land {
 }
 
 export function toArea(row: Row): Area {
-  if (!isAreaScene(row.scene) || !isSkill(row.skill)) {
-    throw new Error(`Khu vực ${String(row.id)} có cảnh/kỹ năng không có trong @lw/shared`);
+  if (!isAreaScene(row.scene)) {
+    throw new Error(`Khu vực ${String(row.id)} có mẫu cảnh không có trong @lw/shared`);
   }
   return {
     id: String(row.id),
     landId: String(row.land_id),
     name: String(row.name),
     scene: row.scene,
-    skill: row.skill,
+    skillId: String(row.skill_id),
     coverMediaId: (row.cover_media_id as string | null) ?? null,
     unlockOrder: Number(row.unlock_order ?? 0),
-    unlockRequirement:
-      row.unlock_requirement && typeof row.unlock_requirement === "object"
-        ? (row.unlock_requirement as Record<string, unknown>)
-        : {},
     isActive: Boolean(row.is_active),
   };
 }
 
-export function toLesson(row: Row): Lesson {
+/** Icon / màu lạ (sửa tay trong database) thì dùng mặc định thay vì làm hỏng trang. */
+export function toSkill(row: Row): Skill {
   return {
     id: String(row.id),
-    areaId: String(row.area_id),
-    title: String(row.title),
-    status: isLessonStatus(row.status) ? row.status : "draft",
-    position: Number(row.position ?? 0),
+    name: String(row.name),
+    description: String(row.description ?? ""),
+    icon: isSkillIconKey(row.icon) ? row.icon : "book",
+    color: isSkillColorKey(row.color) ? row.color : "slate",
+    sortOrder: Number(row.sort_order ?? 0),
   };
 }
 
@@ -68,9 +66,6 @@ export function coverUrlOf(row: Row): string | null {
 export function embeddedCount(value: unknown): number {
   return Array.isArray(value) && typeof value[0]?.count === "number" ? value[0].count : 0;
 }
-
-/** Nhãn ngắn của bài học trong breadcrumb, ví dụ "Bài 1". */
-export const lessonLabel = (lesson: Lesson) => `Bài ${lesson.position}`;
 
 export const getLand = cache(async (landId: string): Promise<Land> => {
   if (!UUID.test(landId)) notFound();
@@ -95,16 +90,10 @@ export const getArea = cache(async (landId: string, areaId: string): Promise<Are
   return toArea(data);
 });
 
-export const getLesson = cache(async (areaId: string, lessonId: string): Promise<Lesson> => {
-  if (!UUID.test(lessonId)) notFound();
+/** Mọi kỹ năng luyện tập, theo thứ tự hiển thị. */
+export const getSkills = cache(async (): Promise<Skill[]> => {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("lessons")
-    .select("*")
-    .eq("id", lessonId)
-    .eq("area_id", areaId)
-    .maybeSingle();
-  if (error) throw new Error(`Không đọc được bài học: ${error.message}`);
-  if (!data) notFound();
-  return toLesson(data);
+  const { data, error } = await supabase.from("skills").select("*").order("sort_order").order("name");
+  if (error) throw new Error(`Không đọc được kỹ năng luyện tập: ${error.message}`);
+  return data.map(toSkill);
 });

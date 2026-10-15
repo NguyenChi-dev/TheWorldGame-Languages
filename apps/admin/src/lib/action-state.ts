@@ -9,10 +9,6 @@ export interface ActionState {
   values?: Record<string, string>;
 }
 
-/**
- * Kết quả của server action gọi trực tiếp từ client (không qua form), ví dụ createLand(input).
- * `code` cho biết lỗi cần xử lý riêng ở giao diện (ví dụ cần người dùng xác nhận rồi gửi lại).
- */
+/** Kết quả của server action gọi trực tiếp từ client (không qua form), ví dụ createLand(input). */
 export type ActionResult<T = undefined> =
-  | { ok: true; message: string; data?: T }
-  | { ok: false; error: string; code?: "confirm_skill_change"; lessonCount?: number };
+  { ok: true; message: string; data?: T } | { ok: false; error: string };

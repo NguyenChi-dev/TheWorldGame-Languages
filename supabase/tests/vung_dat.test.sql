@@ -7,7 +7,7 @@
 -- Chạy: pnpm supabase test db   (mọi thay đổi bị rollback cuối file)
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(35);
+select plan(36);
 
 -- Không phụ thuộc công tắc 2 lớp đang bật hay tắt trên database đang chạy.
 update public.admin_settings set require_mfa = true;
@@ -23,10 +23,10 @@ update public.profiles set role = 'moderator' where id = '9a000000-0000-4000-800
 insert into public.lands (id, slug, language_code, name, sort_order, is_active) values
   ('9b000000-0000-4000-8000-000000000001', 'vd-mot', 'xa', 'Vùng một', 10, true),
   ('9b000000-0000-4000-8000-000000000002', 'vd-hai', 'xb', 'Vùng hai', 11, false);
-insert into public.areas (id, land_id, name, scene, skill, unlock_order, is_active) values
-  ('9c000000-0000-4000-8000-000000000001', '9b000000-0000-4000-8000-000000000001', 'Khu A', 'farm',   'vocabulary', 0, true),
-  ('9c000000-0000-4000-8000-000000000002', '9b000000-0000-4000-8000-000000000001', 'Khu B', 'cinema', 'listening',  1, true),
-  ('9c000000-0000-4000-8000-000000000003', '9b000000-0000-4000-8000-000000000001', 'Khu C', 'park',   'group_talk', 2, false);
+insert into public.areas (id, land_id, name, scene, skill_id, unlock_order, is_active) values
+  ('9c000000-0000-4000-8000-000000000001', '9b000000-0000-4000-8000-000000000001', 'Khu A', 'farm',   (select id from public.skills where name = 'Từ vựng'), 0, true),
+  ('9c000000-0000-4000-8000-000000000002', '9b000000-0000-4000-8000-000000000001', 'Khu B', 'cinema', (select id from public.skills where name = 'Nghe'),  1, true),
+  ('9c000000-0000-4000-8000-000000000003', '9b000000-0000-4000-8000-000000000001', 'Khu C', 'park',   (select id from public.skills where name = 'Hội thoại nhóm'), 2, false);
 
 select col_type_is('public', 'lands', 'id', 'uuid', 'lands.id là uuid');
 select col_is_unique('public', 'lands', 'slug', 'slug không trùng');
@@ -59,8 +59,8 @@ select lives_ok(
                                        '9b000000-0000-4000-8000-000000000001']::uuid[]) $$,
   'editor đổi thứ tự vùng đất');
 select lives_ok(
-  $$ insert into public.areas (land_id, name, scene, skill, unlock_order) values
-     ('9b000000-0000-4000-8000-000000000002', 'Khu mới', 'cafe', 'conversation', 0) $$,
+  $$ insert into public.areas (land_id, name, scene, skill_id, unlock_order) values
+     ('9b000000-0000-4000-8000-000000000002', 'Khu mới', 'cafe', (select id from public.skills where name = 'Hội thoại'), 0) $$,
   'editor tạo được khu vực');
 select lives_ok(
   $$ update public.areas set is_active = true where id = '9c000000-0000-4000-8000-000000000003' $$,
@@ -78,9 +78,13 @@ set constraints public.areas_land_order_key deferred;
 -- Từ migration *_media_xoa_vung_dat: chỉ admin xóa được (RLS); editor chạy DELETE thì không dòng nào bị xóa.
 select lives_ok($$ delete from public.lands where id = '9b000000-0000-4000-8000-000000000003' $$,
   'editor chạy DELETE vùng đất không lỗi nhưng...');
-select throws_ok($$ delete from public.areas where id = '9c000000-0000-4000-8000-000000000001' $$,
-  '42501', null, 'editor không xóa được khu vực');
+-- Từ migration *_xoa_khu_vuc: khu vực cũng chỉ admin xóa được (RLS).
+select lives_ok($$ delete from public.areas where id = '9c000000-0000-4000-8000-000000000001' $$,
+  'editor chạy DELETE khu vực không lỗi nhưng...');
 reset role;
+
+select is((select count(*)::int from public.areas where id = '9c000000-0000-4000-8000-000000000001'), 1,
+  '...RLS chặn: editor không xóa được khu vực');
 
 select is((select count(*)::int from public.lands where id = '9b000000-0000-4000-8000-000000000003'), 1,
   '...RLS chặn: editor không xóa được vùng đất');
@@ -115,8 +119,8 @@ select throws_ok(
   $$ insert into public.lands (slug, language_code, name) values ('vd-mod', 'xf', 'Của moderator') $$,
   '42501', null, 'moderator không tạo được vùng đất');
 select throws_ok(
-  $$ insert into public.areas (land_id, name, scene, skill, unlock_order) values
-     ('9b000000-0000-4000-8000-000000000001', 'Khu moderator', 'cafe', 'reading', 9) $$,
+  $$ insert into public.areas (land_id, name, scene, skill_id, unlock_order) values
+     ('9b000000-0000-4000-8000-000000000001', 'Khu moderator', 'cafe', (select id from public.skills where name = 'Đọc'), 9) $$,
   '42501', null, 'moderator không tạo được khu vực');
 select lives_ok($$ update public.lands set name = 'Moderator sửa' where id = '9b000000-0000-4000-8000-000000000001' $$,
   'moderator chạy UPDATE vùng đất không lỗi nhưng...');

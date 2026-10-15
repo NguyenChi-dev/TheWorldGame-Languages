@@ -1,9 +1,9 @@
 "use client";
 
-import { faGripVertical, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faGripVertical, faPen, faPlus, faTrashCan } from "@fortawesome/free-solid-svg-icons";
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { AREA_SCENE_LABELS, type Area } from "@lw/shared";
+import { AREA_SCENE_LABELS, type Area, type Skill } from "@lw/shared";
 import { Button, Dialog, Switch, useToast } from "@lw/ui";
 import { CoverImage } from "@/components/cover-image";
 import { SCENE_ICONS } from "@/components/content-icons";
@@ -13,12 +13,16 @@ import { SortableList } from "@/components/sortable-list";
 import { cloudinaryThumb } from "@/lib/media-url";
 import { reorderAreas, setAreaActive } from "../actions";
 import { AreaForm } from "./area-form";
+import { DeleteAreaDialog } from "./delete-area-dialog";
 
 export interface AreaRow {
   area: Area;
-  lessonCount: number;
   coverUrl: string | null;
 }
+
+const iconButton =
+  "flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-secondary hover:text-accent " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
 /** Ảnh nhỏ của khu vực; chưa có ảnh (hoặc ảnh mất trên Cloudinary) thì hiện icon của mẫu cảnh. */
 function AreaThumb({ area, coverUrl }: { area: Area; coverUrl: string | null }) {
@@ -38,10 +42,26 @@ function AreaThumb({ area, coverUrl }: { area: Area; coverUrl: string | null }) 
   );
 }
 
-/** Danh sách khu vực của một vùng đất: kéo thả đổi thứ tự MỞ KHÓA, công tắc bật/tắt, thêm khu vực. */
-export function AreasManager({ landId, rows }: { landId: string; rows: AreaRow[] }) {
+/**
+ * Danh sách khu vực của một vùng đất: thêm, sửa (hộp thoại), xóa (chỉ admin), kéo thả đổi thứ tự,
+ * công tắc bật/tắt. Bấm tên khu vực để mở trang khu vực.
+ */
+export function AreasManager({
+  landId,
+  rows,
+  skills,
+  canDelete,
+}: {
+  landId: string;
+  rows: AreaRow[];
+  skills: Skill[];
+  canDelete: boolean;
+}) {
   const toast = useToast();
+  const skillById = new Map(skills.map((skill) => [skill.id, skill]));
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<AreaRow | null>(null);
+  const [deleting, setDeleting] = useState<AreaRow | null>(null);
   const [pending, startTransition] = useTransition();
   const [active, setActive] = useState<Record<string, boolean>>({});
 
@@ -73,8 +93,7 @@ export function AreasManager({ landId, rows }: { landId: string; rows: AreaRow[]
         <div>
           <h2 className="font-game text-lg font-bold text-slate-900">Khu vực ({rows.length})</h2>
           <p className="text-xs text-slate-500">
-            Kéo <FaIcon icon={faGripVertical} /> (hoặc bấm ↑ ↓) để đổi thứ tự mở khóa: khu vực trên cùng mở
-            trước.
+            Kéo <FaIcon icon={faGripVertical} /> (hoặc bấm ↑ ↓) để đổi thứ tự: khu vực trên cùng đứng đầu.
           </p>
         </div>
         <Button size="sm" onClick={() => setAdding(true)}>
@@ -100,7 +119,8 @@ export function AreasManager({ landId, rows }: { landId: string; rows: AreaRow[]
           getId={(row) => row.area.id}
           onReorder={onReorder}
           disabled={pending}
-          renderItem={({ area, lessonCount, coverUrl }, index) => {
+          renderItem={(row, index) => {
+            const { area, coverUrl } = row;
             const isActive = active[area.id] ?? area.isActive;
             return (
               <div className="flex items-center gap-3 rounded-xl px-1 py-0.5">
@@ -111,16 +131,38 @@ export function AreasManager({ landId, rows }: { landId: string; rows: AreaRow[]
                 <Link href={`/lands/${landId}/areas/${area.id}`} className="min-w-0 flex-1 hover:text-accent">
                   <span className="block truncate text-sm font-semibold">{area.name}</span>
                   <span className="block truncate text-xs text-slate-400">
-                    {AREA_SCENE_LABELS[area.scene]} · {lessonCount} bài học
+                    {AREA_SCENE_LABELS[area.scene]}
                   </span>
                 </Link>
-                <SkillBadge skill={area.skill} />
+                <SkillBadge skill={skillById.get(area.skillId)} />
                 <Switch
                   checked={isActive}
                   onCheckedChange={(value) => toggle(area, value)}
                   label={`${isActive ? "Tắt" : "Bật"} khu vực ${area.name}`}
                   disabled={pending}
                 />
+                <span className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    onClick={() => setEditing(row)}
+                    className={iconButton}
+                    aria-label={`Sửa khu vực ${area.name}`}
+                    title="Sửa"
+                  >
+                    <FaIcon icon={faPen} />
+                  </button>
+                  {canDelete ? (
+                    <button
+                      type="button"
+                      onClick={() => setDeleting(row)}
+                      className={`${iconButton} hover:bg-red-50 hover:text-red-600`}
+                      aria-label={`Xóa khu vực ${area.name}`}
+                      title="Xóa"
+                    >
+                      <FaIcon icon={faTrashCan} />
+                    </button>
+                  ) : null}
+                </span>
               </div>
             );
           }}
@@ -134,8 +176,26 @@ export function AreasManager({ landId, rows }: { landId: string; rows: AreaRow[]
         description="Mỗi khu vực luyện một kỹ năng và dùng một mẫu cảnh 3D."
         size="lg"
       >
-        {adding ? <AreaForm landId={landId} onDone={() => setAdding(false)} /> : null}
+        {adding ? <AreaForm landId={landId} skills={skills} onDone={() => setAdding(false)} /> : null}
       </Dialog>
+      <Dialog
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        title={editing ? `Sửa khu vực "${editing.area.name}"` : "Sửa khu vực"}
+        size="lg"
+      >
+        {editing ? (
+          <AreaForm
+            key={editing.area.id}
+            landId={landId}
+            area={editing.area}
+            coverUrl={editing.coverUrl}
+            skills={skills}
+            onDone={() => setEditing(null)}
+          />
+        ) : null}
+      </Dialog>
+      {deleting ? <DeleteAreaDialog area={deleting.area} open onClose={() => setDeleting(null)} /> : null}
     </section>
   );
 }

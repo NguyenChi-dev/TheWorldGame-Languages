@@ -37,12 +37,19 @@ export const ADMIN_SECTION_GROUPS = {
 } as const;
 export type AdminSectionGroup = keyof typeof ADMIN_SECTION_GROUPS;
 
+/** Mục con trên thanh bên, hiện ra khi đang ở trong mục cha. Dùng chung quyền của mục cha. */
+export interface AdminSubSection {
+  href: string;
+  label: string;
+}
+
 export interface AdminSection {
   key: string;
   href: string;
   label: string;
   group: AdminSectionGroup | null;
   roles: readonly StaffRole[];
+  children?: readonly AdminSubSection[];
 }
 
 /**
@@ -58,7 +65,17 @@ export const ADMIN_SECTIONS = {
     group: null,
     roles: ["admin", "editor", "moderator"],
   },
-  lands: { key: "lands", href: "/lands", label: "Vùng đất", group: "content", roles: ["admin", "editor"] },
+  lands: {
+    key: "lands",
+    href: "/lands",
+    label: "Vùng đất",
+    group: "content",
+    roles: ["admin", "editor"],
+    children: [
+      { href: "/lands", label: "Danh sách vùng đất" },
+      { href: "/lands/skills", label: "Kỹ năng luyện tập" },
+    ],
+  },
   words: { key: "words", href: "/words", label: "Kho từ vựng", group: "content", roles: ["admin", "editor"] },
   media: { key: "media", href: "/media", label: "Media", group: "content", roles: ["admin", "editor"] },
   economy: {

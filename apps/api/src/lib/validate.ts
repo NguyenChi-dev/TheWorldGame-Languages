@@ -3,8 +3,8 @@
  * Dữ liệu sai: trả 400 với thông báo tiếng Việt, nêu tên trường bị sai.
  *
  * Cách dùng trong route:
- *   farm.post("/harvest", validate("json", HarvestRequest), (c) => {
- *     const { plotId } = c.req.valid("json"); // đã đúng kiểu, đã kiểm tra
+ *   routes.post("/vi-du", validate("json", ViDuRequest), (c) => {
+ *     const data = c.req.valid("json"); // đã đúng kiểu, đã kiểm tra
  *   })
  */
 import { zValidator } from "@hono/zod-validator";

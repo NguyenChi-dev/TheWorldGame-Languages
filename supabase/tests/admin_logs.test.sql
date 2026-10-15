@@ -7,7 +7,7 @@ select plan(17);
 -- Test không phụ thuộc công tắc 2 lớp đang bật hay tắt trên database đang chạy (rollback cuối test).
 update public.admin_settings set require_mfa = true;
 
--- Người dùng riêng cho test (không phụ thuộc seed.sql).
+-- Người dùng riêng cho test (không phụ thuộc dữ liệu có sẵn).
 insert into auth.users (id, email) values
   ('b0000000-0000-4000-8000-000000000001', 'test-admin@lw.test'),
   ('b0000000-0000-4000-8000-000000000002', 'test-editor@lw.test'),

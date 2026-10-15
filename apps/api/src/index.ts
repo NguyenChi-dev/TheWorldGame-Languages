@@ -10,7 +10,7 @@ if (!isSupabaseConfigured) {
   console.warn(
     [
       "⚠️  Chưa cấu hình Supabase (thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY trong apps/api/.env).",
-      "   Máy chủ vẫn chạy: /health và /catalog dùng được,",
+      "   Máy chủ vẫn chạy: /health dùng được,",
       '   các route cần đăng nhập sẽ trả 503 "Chưa cấu hình Supabase".',
     ].join("\n"),
   );

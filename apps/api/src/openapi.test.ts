@@ -5,7 +5,7 @@ import { openApiDocument } from "./openapi";
 
 const DOC_ROUTES = new Set(["GET /openapi.json", "GET /api-docs"]);
 
-/** Route thật đăng ký trong Hono, dạng "POST /lessons/{id}/submit" (bỏ middleware và route tài liệu). */
+/** Route thật đăng ký trong Hono, dạng "GET /admin/me" (bỏ middleware và route tài liệu). */
 function appRoutes() {
   return new Set(
     app.routes
@@ -28,24 +28,15 @@ describe("Tài liệu OpenAPI", () => {
     expect([...documentedRoutes()].sort()).toEqual([...appRoutes()].sort());
   });
 
-  it("schema sinh từ Zod: body, tham số đường dẫn và query", () => {
-    const plant = openApiDocument.paths["/farm/plant"].post as {
-      requestBody: { content: { "application/json": { schema: { required: string[] } } } };
+  it("schema trả về sinh từ Zod", () => {
+    const adminMe = openApiDocument.paths["/admin/me"].get as {
+      responses: { 200: { content: { "application/json": { schema: { required: string[] } } } } };
     };
-    expect(plant.requestBody.content["application/json"].schema.required).toEqual(["plotId", "seedId"]);
-
-    const submit = openApiDocument.paths["/lessons/{id}/submit"].post as {
-      parameters: { name: string; in: string }[];
-    };
-    expect(submit.parameters).toContainEqual(expect.objectContaining({ name: "id", in: "path" }));
-
-    const stats = openApiDocument.paths["/admin/stats"].get as {
-      parameters: { name: string; in: string; required: boolean }[];
-    };
-    // days có mặc định 7 nên không bắt buộc.
-    expect(stats.parameters).toContainEqual(
-      expect.objectContaining({ name: "days", in: "query", required: false }),
-    );
+    expect(adminMe.responses[200].content["application/json"].schema.required).toEqual([
+      "id",
+      "email",
+      "role",
+    ]);
   });
 
   it("route công khai không đòi token, route quản trị ghi rõ lỗi 403", () => {

@@ -5,13 +5,18 @@ import { createClient } from "@/lib/supabase/server";
 import {
   createArea,
   createLand,
+  createSkill,
+  deleteArea,
   deleteLand,
+  deleteSkill,
   reorderAreas,
   reorderLands,
+  reorderSkills,
   setAreaActive,
   setLandActive,
   updateArea,
   updateLand,
+  updateSkill,
 } from "./actions";
 
 vi.mock("server-only", () => ({}));
@@ -27,6 +32,8 @@ const LAND = "a17d0000-0000-4000-8000-000000000001";
 const LAND_2 = "a17d0000-0000-4000-8000-000000000002";
 const AREA = "a5ea0000-0000-4000-8000-000000000001";
 const AREA_2 = "a5ea0000-0000-4000-8000-000000000002";
+const SKILL = "5c110000-0000-4000-8000-000000000001";
+const SKILL_2 = "5c110000-0000-4000-8000-000000000002";
 
 type Result = { data?: unknown; error?: unknown; count?: number };
 
@@ -75,10 +82,10 @@ function fakeDb(script: Record<string, Result[]>) {
 const validLand = { name: "Tiếng Hàn", slug: "tieng-han", languageCode: "KO", description: "" };
 const validArea = {
   name: "Chợ",
-  skill: "conversation",
+  skillId: SKILL,
   scene: "market",
-  unlockRequirement: { lessons_done: 3 },
 };
+const validSkill = { name: "Phát âm", description: "Nói theo mẫu", icon: "microphone", color: "rose" };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -95,6 +102,9 @@ describe("chặn sai vai trò (lớp 2) trước khi đụng database", () => {
     ["updateArea", () => updateArea(AREA, validArea)],
     ["setAreaActive", () => setAreaActive(AREA, true)],
     ["reorderAreas", () => reorderAreas(LAND, [AREA])],
+    ["createSkill", () => createSkill(validSkill)],
+    ["updateSkill", () => updateSkill(SKILL, validSkill)],
+    ["reorderSkills", () => reorderSkills([SKILL])],
   ])("%s: moderator/player bị từ chối", async (_name, call) => {
     vi.mocked(requireRole).mockRejectedValue(new AuthError("forbidden"));
     await expect(call()).resolves.toEqual({ ok: false, error: "Bạn không có quyền làm việc này" });
@@ -117,11 +127,20 @@ describe("kiểm tra dữ liệu bằng Zod", () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
-  it("kỹ năng không có trong danh sách cố định", async () => {
-    expect(await createArea(LAND, { ...validArea, skill: "dancing" })).toEqual({
+  it("khu vực chưa chọn kỹ năng (mã không phải UUID)", async () => {
+    expect(await createArea(LAND, { ...validArea, skillId: "" })).toEqual({
       ok: false,
       error: "Chọn kỹ năng",
     });
+  });
+
+  it.each([
+    [{ ...validSkill, name: " " }, "Nhập tên kỹ năng"],
+    [{ ...validSkill, icon: "rocket" }, "Chọn icon"],
+    [{ ...validSkill, color: "black" }, "Chọn màu"],
+  ])("kỹ năng sai: %j", async (input, message) => {
+    expect(await createSkill(input)).toEqual({ ok: false, error: message });
+    expect(createClient).not.toHaveBeenCalled();
   });
 });
 
@@ -230,33 +249,17 @@ describe("khu vực", () => {
     expect(db.writes()[0].payload).toMatchObject({
       land_id: LAND,
       unlock_order: 3,
-      skill: "conversation",
+      skill_id: SKILL,
       scene: "market",
-      unlock_requirement: { lessons_done: 3 },
     });
     expect(logAction).toHaveBeenCalledTimes(1);
   });
 
-  it("đổi kỹ năng của khu vực đã có bài học: phải xác nhận trước", async () => {
-    const db = fakeDb({
-      "areas.select": [{ data: { id: AREA, skill: "vocabulary", land_id: LAND } }],
-      "lessons.select": [{ count: 2 }],
-    });
-    expect(await updateArea(AREA, validArea)).toEqual({
-      ok: false,
-      code: "confirm_skill_change",
-      lessonCount: 2,
-      error: "Khu vực đang có 2 bài học soạn cho kỹ năng cũ. Xác nhận nếu vẫn muốn đổi kỹ năng.",
-    });
-    expect(db.writes()).toEqual([]);
-    expect(logAction).not.toHaveBeenCalled();
-  });
-
-  it("đổi kỹ năng sau khi xác nhận: lưu và ghi 1 dòng nhật ký", async () => {
-    const before = { id: AREA, skill: "vocabulary", land_id: LAND };
-    const after = { id: AREA, skill: "conversation", land_id: LAND, name: "Chợ" };
+  it("sửa: lưu và ghi 1 dòng nhật ký có before / after", async () => {
+    const before = { id: AREA, skill_id: SKILL_2, land_id: LAND };
+    const after = { id: AREA, skill_id: SKILL, land_id: LAND, name: "Chợ" };
     const db = fakeDb({ "areas.select": [{ data: before }], "areas.update": [{ data: after }] });
-    expect((await updateArea(AREA, validArea, { confirmSkillChange: true })).ok).toBe(true);
+    expect((await updateArea(AREA, validArea)).ok).toBe(true);
     expect(db.writes()).toHaveLength(1);
     expect(logAction).toHaveBeenCalledWith({
       action: "areas.update",
@@ -327,16 +330,11 @@ describe("xóa vùng đất", () => {
     expect(db.writes()).toEqual([]);
   });
 
-  it("vùng đất còn khu vực / từ vựng thì không xóa, gợi ý tắt thay vì xóa", async () => {
-    const db = fakeDb({
-      "lands.select": [{ data: land }],
-      "areas.select": [{ count: 2 }],
-      "words.select": [{ count: 5 }],
-    });
+  it("vùng đất còn khu vực thì không xóa, gợi ý xóa khu vực trước", async () => {
+    const db = fakeDb({ "lands.select": [{ data: land }], "areas.select": [{ count: 2 }] });
     expect(await deleteLand(LAND, "tieng-han")).toEqual({
       ok: false,
-      error:
-        "Vùng đất còn 2 khu vực và 5 từ vựng nên không xóa được. Hãy tắt vùng đất để ẩn, hoặc chuyển / xóa nội dung bên trong trước.",
+      error: "Vùng đất còn 2 khu vực nên không xóa được. Hãy xóa các khu vực trước, hoặc tắt vùng đất để ẩn.",
     });
     expect(db.writes()).toEqual([]);
     expect(logAction).not.toHaveBeenCalled();
@@ -346,7 +344,6 @@ describe("xóa vùng đất", () => {
     const db = fakeDb({
       "lands.select": [{ data: land }],
       "areas.select": [{ count: 0 }],
-      "words.select": [{ count: 0 }],
       "lands.delete": [{ data: [{ id: LAND }] }],
     });
     expect(await deleteLand(LAND, " tieng-han ")).toEqual({
@@ -363,19 +360,17 @@ describe("xóa vùng đất", () => {
     });
   });
 
-  it("database chặn (còn dữ liệu người chơi) thì báo lỗi, không ghi nhật ký", async () => {
+  it("database chặn (vừa có khu vực mới) thì báo lỗi, không ghi nhật ký", async () => {
     fakeDb({
       "lands.select": [{ data: land }],
       "areas.select": [{ count: 0 }],
-      "words.select": [{ count: 0 }],
       "lands.delete": [
-        { error: { code: "23503", message: "violates foreign key constraint farm_plots_land_id_fkey" } },
+        { error: { code: "23503", message: "violates foreign key constraint areas_land_id_fkey" } },
       ],
     });
     expect(await deleteLand(LAND, "tieng-han")).toEqual({
       ok: false,
-      error:
-        "Vùng đất vẫn còn dữ liệu liên quan (khu vực, từ vựng hoặc tiến độ người chơi) nên không xóa được",
+      error: "Vùng đất vẫn còn khu vực nên không xóa được",
     });
     expect(logAction).not.toHaveBeenCalled();
   });
@@ -384,12 +379,178 @@ describe("xóa vùng đất", () => {
     fakeDb({
       "lands.select": [{ data: land }],
       "areas.select": [{ count: 0 }],
-      "words.select": [{ count: 0 }],
       "lands.delete": [{ data: [] }],
     });
     expect(await deleteLand(LAND, "tieng-han")).toEqual({
       ok: false,
       error: "Không xóa được vùng đất (không có quyền)",
     });
+  });
+});
+
+describe("xóa khu vực", () => {
+  const area = { id: AREA, land_id: LAND, name: "Chợ" };
+
+  it("chỉ admin: editor bị từ chối trước khi đụng database", async () => {
+    vi.mocked(requireRole).mockRejectedValue(new AuthError("forbidden"));
+    expect(await deleteArea(AREA, "Chợ")).toEqual({ ok: false, error: "Bạn không có quyền làm việc này" });
+    expect(requireRole).toHaveBeenCalledWith(["admin"]);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("gõ sai tên thì không xóa", async () => {
+    const db = fakeDb({ "areas.select": [{ data: area }] });
+    expect(await deleteArea(AREA, "Cho")).toEqual({ ok: false, error: 'Gõ đúng tên "Chợ" để xác nhận xóa' });
+    expect(db.writes()).toEqual([]);
+  });
+
+  it("xóa và ghi đúng 1 dòng nhật ký (lưu dữ liệu trước khi xóa)", async () => {
+    const db = fakeDb({ "areas.select": [{ data: area }], "areas.delete": [{ data: [{ id: AREA }] }] });
+    expect(await deleteArea(AREA, " Chợ ")).toEqual({ ok: true, message: 'Đã xóa khu vực "Chợ"' });
+    expect(db.writes().map((c) => c.key)).toEqual(["areas.delete"]);
+    expect(logAction).toHaveBeenCalledTimes(1);
+    expect(logAction).toHaveBeenCalledWith({
+      action: "areas.delete",
+      targetTable: "areas",
+      targetId: AREA,
+      before: area,
+    });
+  });
+
+  it("RLS chặn (không dòng nào bị xóa) thì báo lỗi, không ghi nhật ký", async () => {
+    fakeDb({ "areas.select": [{ data: area }], "areas.delete": [{ data: [] }] });
+    expect(await deleteArea(AREA, "Chợ")).toEqual({
+      ok: false,
+      error: "Không xóa được khu vực (không có quyền)",
+    });
+    expect(logAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("kỹ năng luyện tập", () => {
+  const skill = { id: SKILL, name: "Phát âm" };
+
+  it("tạo mới: đứng cuối danh sách, ghi đúng 1 dòng nhật ký", async () => {
+    const db = fakeDb({
+      "skills.select": [{ data: { sort_order: 7 } }],
+      "skills.insert": [{ data: { id: SKILL, name: "Phát âm" } }],
+    });
+    expect(await createSkill({ ...validSkill, name: "  Phát âm " })).toEqual({
+      ok: true,
+      message: 'Đã tạo kỹ năng "Phát âm"',
+      data: { id: SKILL },
+    });
+    expect(db.writes()[0].payload).toEqual({
+      name: "Phát âm",
+      description: "Nói theo mẫu",
+      icon: "microphone",
+      color: "rose",
+      sort_order: 8,
+    });
+    expect(logAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("trùng tên: báo lỗi tiếng Việt, không ghi nhật ký", async () => {
+    fakeDb({
+      "skills.select": [{ data: null }],
+      "skills.insert": [
+        {
+          error: {
+            code: "23505",
+            message: 'duplicate key value violates unique constraint "skills_name_key"',
+          },
+        },
+      ],
+    });
+    expect(await createSkill(validSkill)).toEqual({ ok: false, error: "Đã có kỹ năng trùng tên này" });
+    expect(logAction).not.toHaveBeenCalled();
+  });
+
+  it("sửa: nhật ký có before / after", async () => {
+    const after = { ...skill, icon: "microphone" };
+    fakeDb({ "skills.select": [{ data: skill }], "skills.update": [{ data: after }] });
+    expect(await updateSkill(SKILL, validSkill)).toEqual({ ok: true, message: 'Đã lưu kỹ năng "Phát âm"' });
+    expect(logAction).toHaveBeenCalledWith({
+      action: "skills.update",
+      targetTable: "skills",
+      targetId: SKILL,
+      before: skill,
+      after,
+    });
+  });
+
+  it("đổi thứ tự: phải gửi đủ mọi kỹ năng", async () => {
+    const db = fakeDb({ "skills.select": [{ data: [{ id: SKILL }, { id: SKILL_2 }] }] });
+    expect(await reorderSkills([SKILL])).toEqual({
+      ok: false,
+      error: "Danh sách kỹ năng đã thay đổi. Tải lại trang rồi thử lại",
+    });
+    expect(db.writes()).toEqual([]);
+  });
+
+  it("đổi thứ tự: gọi rpc reorder_skills một lần, ghi 1 dòng nhật ký", async () => {
+    const db = fakeDb({ "skills.select": [{ data: [{ id: SKILL }, { id: SKILL_2 }] }] });
+    expect((await reorderSkills([SKILL_2, SKILL])).ok).toBe(true);
+    expect(db.writes()).toEqual([{ key: "rpc.reorder_skills", payload: { ids: [SKILL_2, SKILL] } }]);
+    expect(logAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("xóa: chỉ admin, editor bị từ chối trước khi đụng database", async () => {
+    vi.mocked(requireRole).mockRejectedValue(new AuthError("forbidden"));
+    expect(await deleteSkill(SKILL, "Phát âm")).toEqual({
+      ok: false,
+      error: "Bạn không có quyền làm việc này",
+    });
+    expect(requireRole).toHaveBeenCalledWith(["admin"]);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("xóa: gõ sai tên thì không xóa", async () => {
+    const db = fakeDb({ "skills.select": [{ data: skill }] });
+    expect(await deleteSkill(SKILL, "phat am")).toEqual({
+      ok: false,
+      error: 'Gõ đúng tên "Phát âm" để xác nhận xóa',
+    });
+    expect(db.writes()).toEqual([]);
+  });
+
+  it("xóa: kỹ năng còn khu vực dùng thì không xóa", async () => {
+    const db = fakeDb({ "skills.select": [{ data: skill }], "areas.select": [{ count: 3 }] });
+    expect(await deleteSkill(SKILL, "Phát âm")).toEqual({
+      ok: false,
+      error: "Kỹ năng đang được 3 khu vực dùng nên không xóa được. Hãy đổi kỹ năng của các khu vực đó trước.",
+    });
+    expect(db.writes()).toEqual([]);
+  });
+
+  it("xóa: không còn khu vực dùng thì xóa, nhật ký lưu dữ liệu trước khi xóa", async () => {
+    const db = fakeDb({
+      "skills.select": [{ data: skill }],
+      "areas.select": [{ count: 0 }],
+      "skills.delete": [{ data: [{ id: SKILL }] }],
+    });
+    expect(await deleteSkill(SKILL, " Phát âm ")).toEqual({ ok: true, message: 'Đã xóa kỹ năng "Phát âm"' });
+    expect(db.writes().map((c) => c.key)).toEqual(["skills.delete"]);
+    expect(logAction).toHaveBeenCalledWith({
+      action: "skills.delete",
+      targetTable: "skills",
+      targetId: SKILL,
+      before: skill,
+    });
+  });
+
+  it("xóa: database chặn (vừa có khu vực dùng) thì báo lỗi, không ghi nhật ký", async () => {
+    fakeDb({
+      "skills.select": [{ data: skill }],
+      "areas.select": [{ count: 0 }],
+      "skills.delete": [
+        { error: { code: "23503", message: "violates foreign key constraint areas_skill_id_fkey" } },
+      ],
+    });
+    expect(await deleteSkill(SKILL, "Phát âm")).toEqual({
+      ok: false,
+      error: "Kỹ năng vẫn đang được khu vực dùng nên không xóa được",
+    });
+    expect(logAction).not.toHaveBeenCalled();
   });
 });

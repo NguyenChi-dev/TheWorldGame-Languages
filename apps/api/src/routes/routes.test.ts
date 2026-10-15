@@ -104,75 +104,34 @@ describe("GET /me", () => {
   });
 });
 
-describe("POST /farm/harvest", () => {
-  it("dữ liệu đúng thì tới được route khung và nhận 501", async () => {
-    const body = JSON.stringify({ plotId: "33333333-3333-4333-8333-333333333333" });
-    const res = await app.request("/farm/harvest", asUser(PLAYER_TOKEN, { method: "POST", body }));
-    expect(res.status).toBe(501);
-    expect(await res.json()).toEqual({ error: "Chưa làm" });
-  });
-
-  it("thiếu plotId thì trả 400 và nêu tên trường", async () => {
-    const res = await app.request("/farm/harvest", asUser(PLAYER_TOKEN, { method: "POST", body: "{}" }));
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "Dữ liệu gửi lên không hợp lệ: plotId" });
-  });
-
-  it("JSON hỏng trả 400 tiếng Việt, không lộ lỗi nội bộ", async () => {
-    const res = await app.request("/farm/harvest", asUser(PLAYER_TOKEN, { method: "POST", body: "{hỏng" }));
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "Dữ liệu gửi lên không hợp lệ" });
-  });
-});
-
-describe("POST /lessons/:id/submit", () => {
-  it("kiểm tra cả tham số đường dẫn lẫn nội dung", async () => {
-    const body = JSON.stringify({ answers: [{ wordId: "en-carrot", answer: "cà rốt" }] });
-    const res = await app.request(
-      "/lessons/vegetables-1/submit",
-      asUser(PLAYER_TOKEN, { method: "POST", body }),
-    );
-    expect(res.status).toBe(501);
-  });
-});
-
-describe("GET /admin/stats", () => {
+describe("Quyền vào route quản trị (GET /admin/me)", () => {
   it("người chơi thường bị chặn 403", async () => {
-    const res = await app.request("/admin/stats", asUser(PLAYER_TOKEN));
+    const res = await app.request("/admin/me", asUser(PLAYER_TOKEN));
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "Bạn không có quyền truy cập trang quản trị" });
   });
 
-  it.each([ADMIN_TOKEN, EDITOR_TOKEN, MODERATOR_TOKEN])(
-    "nhân viên (%s) đi qua được tới route khung",
-    async (token) => {
-      const res = await app.request("/admin/stats?days=30", asUser(token));
-      expect(res.status).toBe(501);
-    },
-  );
+  it.each([ADMIN_TOKEN, EDITOR_TOKEN, MODERATOR_TOKEN])("nhân viên (%s) vào được", async (token) => {
+    const res = await app.request("/admin/me", asUser(token));
+    expect(res.status).toBe(200);
+  });
 
   it("công tắc 2 lớp đang tắt: admin aal1 đi qua, người chơi vẫn bị chặn", async () => {
     settings.requireMfa = false;
     try {
-      expect((await app.request("/admin/stats", asUser(ADMIN_AAL1_TOKEN))).status).toBe(501);
-      expect((await app.request("/admin/stats", asUser(PLAYER_TOKEN))).status).toBe(403);
+      expect((await app.request("/admin/me", asUser(ADMIN_AAL1_TOKEN))).status).toBe(200);
+      expect((await app.request("/admin/me", asUser(PLAYER_TOKEN))).status).toBe(403);
     } finally {
       settings.requireMfa = true;
     }
   });
 
   it("admin mới nhập mật khẩu (aal1, chưa TOTP) bị chặn 403", async () => {
-    const res = await app.request("/admin/stats", asUser(ADMIN_AAL1_TOKEN));
+    const res = await app.request("/admin/me", asUser(ADMIN_AAL1_TOKEN));
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({
       error: "Cần xác thực hai lớp (TOTP) trước khi dùng chức năng quản trị",
     });
-  });
-
-  it("query sai (days=1000) trả 400", async () => {
-    const res = await app.request("/admin/stats?days=1000", asUser(ADMIN_TOKEN));
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "Dữ liệu gửi lên không hợp lệ: days" });
   });
 });
 

@@ -3,11 +3,10 @@
 import { useGameStore } from "@/store/game-store";
 import { useApiHealth } from "./use-api-health";
 
-/** Thông tin hiển thị đè lên game: số vàng (trái), trạng thái realtime và API (phải). */
+/** Thông tin hiển thị đè lên game: trạng thái realtime và API (góc phải). */
 export function Hud() {
   useApiHealth();
 
-  const gold = useGameStore((state) => state.gold);
   const connection = useGameStore((state) => state.connection);
   const onlineCount = useGameStore((state) => state.onlineCount);
   const apiStatus = useGameStore((state) => state.apiStatus);
@@ -22,8 +21,7 @@ export function Hud() {
   const apiLabel = apiStatus === "ok" ? "API: OK" : apiStatus === "offline" ? "API: Offline" : "API: ...";
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-      <div className="rounded-full bg-white/90 px-4 py-1.5 font-bold text-amber-600 shadow">🪙 {gold}</div>
+    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
       <div className="flex flex-col items-end gap-1.5">
         <div
           className={`rounded-full px-3 py-1 text-sm font-semibold text-white shadow ${

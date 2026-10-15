@@ -5,28 +5,9 @@
  * - Nếu người chơi đã đăng nhập Supabase, tự gắn "Authorization: Bearer <token>".
  * - Kiểu dữ liệu gửi lên/trả về lấy từ @lw/shared/api (import type: không kéo Zod vào trình duyệt).
  *
- * Mọi thay đổi dữ liệu game (vàng, nông trại, mua bán, bài học) PHẢI đi qua các hàm ở đây.
+ * Mọi thay đổi dữ liệu game PHẢI đi qua các hàm ở đây (thêm hàm khi làm tới tính năng đó).
  */
-import type {
-  AdminStatsQuery,
-  AdminStatsResponse,
-  BuyRequest,
-  BuyResponse,
-  CatalogSeedsResponse,
-  ErrorResponse,
-  HarvestRequest,
-  HarvestResponse,
-  HealthResponse,
-  LessonSubmitRequest,
-  LessonSubmitResponse,
-  MeResponse,
-  PlantRequest,
-  PlantResponse,
-  SellRequest,
-  SellResponse,
-  WaterRequest,
-  WaterResponse,
-} from "@lw/shared/api";
+import type { ErrorResponse, HealthResponse, MeResponse } from "@lw/shared/api";
 import { createClient } from "@/lib/supabase/client";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
@@ -93,24 +74,5 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
 /** Các hàm gọi từng route của apps/api, đã có sẵn kiểu dữ liệu. */
 export const api = {
   health: (signal?: AbortSignal) => apiFetch<HealthResponse>("/health", { signal, auth: false }),
-  seeds: () => apiFetch<CatalogSeedsResponse>("/catalog/seeds", { auth: false }),
   me: () => apiFetch<MeResponse>("/me"),
-
-  plant: (body: PlantRequest) => apiFetch<PlantResponse>("/farm/plant", { method: "POST", body }),
-  water: (body: WaterRequest) => apiFetch<WaterResponse>("/farm/water", { method: "POST", body }),
-  harvest: (body: HarvestRequest) => apiFetch<HarvestResponse>("/farm/harvest", { method: "POST", body }),
-
-  buy: (body: BuyRequest) => apiFetch<BuyResponse>("/shop/buy", { method: "POST", body }),
-  sell: (body: SellRequest) => apiFetch<SellResponse>("/shop/sell", { method: "POST", body }),
-
-  submitLesson: (lessonId: string, body: LessonSubmitRequest) =>
-    apiFetch<LessonSubmitResponse>(`/lessons/${encodeURIComponent(lessonId)}/submit`, {
-      method: "POST",
-      body,
-    }),
-
-  adminStats: (query: Partial<AdminStatsQuery> = {}) => {
-    const search = query.days ? `?days=${query.days}` : "";
-    return apiFetch<AdminStatsResponse>(`/admin/stats${search}`);
-  },
 };

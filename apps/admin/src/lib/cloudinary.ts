@@ -10,7 +10,7 @@ import { timingSafeEqual } from "node:crypto";
 import { v2 as cloudinary } from "cloudinary";
 
 /** Thư mục con được phép tải lên, theo loại nội dung. */
-export const MEDIA_FOLDERS = ["lands", "areas", "words", "lessons", "misc"] as const;
+export const MEDIA_FOLDERS = ["lands", "areas"] as const;
 export type MediaFolder = (typeof MEDIA_FOLDERS)[number];
 
 let configured: boolean | undefined;

@@ -11,12 +11,8 @@ import { env } from "./env.js";
 import { ApiError, errorJson, Messages, messageForStatus } from "./lib/errors.js";
 import { openApiDocument } from "./openapi.js";
 import { adminRoutes } from "./routes/admin.js";
-import { catalogRoutes } from "./routes/catalog.js";
-import { farmRoutes } from "./routes/farm.js";
 import { healthRoutes } from "./routes/health.js";
-import { lessonRoutes } from "./routes/lessons.js";
 import { meRoutes } from "./routes/me.js";
-import { shopRoutes } from "./routes/shop.js";
 
 export function createApp(allowedOrigins: string[] = env.CORS_ORIGINS, docs: boolean = env.API_DOCS) {
   const app = new Hono();
@@ -48,11 +44,7 @@ export function createApp(allowedOrigins: string[] = env.CORS_ORIGINS, docs: boo
 
   // 4. Các route.
   app.route("/health", healthRoutes);
-  app.route("/catalog", catalogRoutes);
   app.route("/me", meRoutes);
-  app.route("/farm", farmRoutes);
-  app.route("/shop", shopRoutes);
-  app.route("/lessons", lessonRoutes);
   app.route("/admin", adminRoutes);
 
   // 5. Tài liệu API: Swagger UI ở /api-docs, đặc tả OpenAPI ở /openapi.json (tắt bằng API_DOCS=false).

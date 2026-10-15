@@ -51,10 +51,10 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     return error ? null : (total ?? 0);
   };
 
-  const [lands, words, items, players, logs, profiles] = await Promise.all([
+  const [lands, areas, media, players, logs, profiles] = await Promise.all([
     count("lands"),
-    count("words"),
-    count("items"),
+    count("areas"),
+    count("media"),
     canSeePlayers ? count("profiles") : Promise.resolve(null),
     canSeeLogs
       ? supabase
@@ -72,11 +72,12 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       : Promise.resolve(null),
   ]);
 
-  const stats: { key: AdminSectionKey; label: string; value: number | null; show: boolean }[] = [
-    { key: "lands", label: "Vùng đất", value: lands, show: true },
-    { key: "words", label: "Từ vựng", value: words, show: true },
-    { key: "economy", label: "Vật phẩm", value: items, show: true },
-    { key: "players", label: "Tài khoản", value: players, show: canSeePlayers },
+  // key: mục trên thanh bên mà ô số liệu dẫn tới (lấy icon và đường dẫn của mục đó).
+  const stats: { id: string; key: AdminSectionKey; label: string; value: number | null; show: boolean }[] = [
+    { id: "lands", key: "lands", label: "Vùng đất", value: lands, show: true },
+    { id: "areas", key: "lands", label: "Khu vực", value: areas, show: true },
+    { id: "media", key: "media", label: "Ảnh", value: media, show: true },
+    { id: "players", key: "players", label: "Tài khoản", value: players, show: canSeePlayers },
   ];
   const otherSections = sectionsForRole(session.role).filter((section) => section.key !== "overview");
 
@@ -108,14 +109,14 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
             const className = "rounded-2xl border border-secondary bg-white p-4 shadow-sm";
             return linkable ? (
               <Link
-                key={stat.key}
+                key={stat.id}
                 href={ADMIN_SECTIONS[stat.key].href}
                 className={`${className} transition hover:border-primary/60 hover:shadow-md`}
               >
                 {body}
               </Link>
             ) : (
-              <div key={stat.key} className={className}>
+              <div key={stat.id} className={className}>
                 {body}
               </div>
             );

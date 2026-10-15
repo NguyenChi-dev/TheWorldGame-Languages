@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Backend của phần Vùng đất / Khu vực (server action).
+ * Backend của phần Vùng đất / Khu vực / Kỹ năng luyện tập (server action).
  *
  * Mỗi hàm làm đúng thứ tự:
  *   1. requireRole(['admin','editor'])   lớp 2: chặn sai vai trò ngay ở máy chủ.
@@ -10,13 +10,12 @@
  *      trong database kiểm tra vai trò lần nữa (lớp 3).
  *   4. logAction với before / after      đúng MỘT dòng admin_logs cho mỗi thao tác ghi.
  *
- * Xóa: chỉ vùng đất, chỉ admin, chỉ khi vùng đất không còn khu vực / từ vựng / dữ liệu người chơi
- * (database cũng chặn bằng ON DELETE RESTRICT). Thường thì nên TẮT is_active để ẩn thay vì xóa.
- * Khu vực chưa có chức năng xóa.
+ * Xóa: chỉ admin (RLS cũng chỉ cho admin). Vùng đất còn khu vực, kỹ năng còn khu vực dùng thì không
+ * xóa (database cũng chặn bằng ON DELETE RESTRICT). Thường nên TẮT is_active để ẩn thay vì xóa.
  */
 import { revalidatePath } from "next/cache";
 import type { PostgrestError } from "@supabase/supabase-js";
-import { AreaInput, IdList, LandInput } from "@lw/shared/schemas";
+import { AreaInput, IdList, LandInput, SkillInput } from "@lw/shared/schemas";
 import type { ActionResult } from "@/lib/action-state";
 import { logAction, type LogActionInput } from "@/lib/audit";
 import { AuthError, requireRole } from "@/lib/auth";
@@ -24,8 +23,8 @@ import { UUID } from "@/lib/content";
 import { createClient } from "@/lib/supabase/server";
 
 const CONTENT_EDITORS = ["admin", "editor"] as const;
-/** Xóa vùng đất là thao tác không hoàn tác được: chỉ admin. */
-const LAND_DELETERS = ["admin"] as const;
+/** Xóa vùng đất / khu vực / kỹ năng không hoàn tác được: chỉ admin. Editor tắt is_active để ẩn. */
+const DELETERS = ["admin"] as const;
 
 type Row = Record<string, unknown>;
 
@@ -54,12 +53,14 @@ function dbError(error: PostgrestError | null, fallback: string): string {
     if (text.includes("lands_slug_key")) return "Slug này đã được dùng cho vùng đất khác";
     if (text.includes("lands_language_code_key")) return "Mã ngôn ngữ này đã có vùng đất khác";
     if (text.includes("areas_land_order_key")) return "Thứ tự mở khóa bị trùng. Tải lại trang rồi thử lại";
+    if (text.includes("skills_name_key")) return "Đã có kỹ năng trùng tên này";
     return "Dữ liệu bị trùng với một mục đã có";
   }
   if (error.code === "42501") return "Bạn không có quyền làm việc này";
   if (error.code === "23514") return "Dữ liệu không đúng định dạng";
   if (error.code === "23503") {
     if (text.includes("cover_media_id")) return "Ảnh bìa không tồn tại. Hãy tải ảnh lên lại";
+    if (text.includes("skill_id")) return "Kỹ năng không tồn tại. Tải lại trang rồi chọn lại";
     return "Vùng đất không tồn tại";
   }
   console.error("[lands/actions] Lỗi database:", error);
@@ -87,15 +88,26 @@ const landRow = (input: ReturnType<typeof LandInput.parse>) => ({
 
 const areaRow = (input: ReturnType<typeof AreaInput.parse>) => ({
   name: input.name,
-  skill: input.skill,
+  skill_id: input.skillId,
   scene: input.scene,
   cover_media_id: input.coverMediaId,
-  unlock_requirement: input.unlockRequirement,
 });
 
 function revalidateLand(landId?: string) {
   revalidatePath("/lands");
   if (landId) revalidatePath(`/lands/${landId}`, "layout");
+}
+
+const skillRow = (input: ReturnType<typeof SkillInput.parse>) => ({
+  name: input.name,
+  description: input.description,
+  icon: input.icon,
+  color: input.color,
+});
+
+/** Kỹ năng hiện ở danh sách kỹ năng và trong mọi trang khu vực. */
+function revalidateSkills() {
+  revalidatePath("/lands", "layout");
 }
 
 // =============================================================================
@@ -267,15 +279,7 @@ export async function createArea(landId: string, input: unknown): Promise<Action
   return { ok: true, message: `Đã tạo khu vực "${data.name}" (đang tắt)`, data: { id: data.id } };
 }
 
-/**
- * Sửa khu vực. Đổi kỹ năng của khu vực ĐÃ CÓ bài học thì phải gửi lại với confirmSkillChange = true
- * (giao diện hiện cảnh báo trước), vì bài học được soạn theo mini-game của kỹ năng cũ.
- */
-export async function updateArea(
-  id: string,
-  input: unknown,
-  options: { confirmSkillChange?: boolean } = {},
-): Promise<ActionResult> {
+export async function updateArea(id: string, input: unknown): Promise<ActionResult> {
   const denied = await guard();
   if (denied) return fail(denied);
   if (!UUID.test(id)) return fail("Mã khu vực không hợp lệ");
@@ -285,21 +289,6 @@ export async function updateArea(
   const supabase = await createClient();
   const { data: before } = await supabase.from("areas").select("*").eq("id", id).maybeSingle();
   if (!before) return fail("Không tìm thấy khu vực");
-
-  if (before.skill !== parsed.data.skill && !options.confirmSkillChange) {
-    const { count } = await supabase
-      .from("lessons")
-      .select("id", { count: "exact", head: true })
-      .eq("area_id", id);
-    if ((count ?? 0) > 0) {
-      return {
-        ok: false,
-        code: "confirm_skill_change",
-        lessonCount: count ?? 0,
-        error: `Khu vực đang có ${count} bài học soạn cho kỹ năng cũ. Xác nhận nếu vẫn muốn đổi kỹ năng.`,
-      };
-    }
-  }
 
   const { data: after, error } = await supabase
     .from("areas")
@@ -386,15 +375,42 @@ export async function reorderAreas(landId: string, ids: unknown): Promise<Action
 }
 
 // =============================================================================
+// XÓA KHU VỰC
+// =============================================================================
+
+/** Xóa vĩnh viễn một khu vực. Chỉ admin; phải gõ đúng tên khu vực để xác nhận. */
+export async function deleteArea(id: string, confirmName: string): Promise<ActionResult> {
+  const denied = await guard(DELETERS);
+  if (denied) return fail(denied);
+  if (!UUID.test(id)) return fail("Mã khu vực không hợp lệ");
+
+  const supabase = await createClient();
+  const { data: before } = await supabase.from("areas").select("*").eq("id", id).maybeSingle();
+  if (!before) return fail("Không tìm thấy khu vực");
+  if (typeof confirmName !== "string" || confirmName.trim() !== before.name) {
+    return fail(`Gõ đúng tên "${before.name}" để xác nhận xóa`);
+  }
+
+  const { data: deleted, error } = await supabase.from("areas").delete().eq("id", id).select("id");
+  if (error) return fail(dbError(error, "Không xóa được khu vực"));
+  if (!deleted || deleted.length === 0) return fail("Không xóa được khu vực (không có quyền)");
+
+  const auditError = await audit({ action: "areas.delete", targetTable: "areas", targetId: id, before });
+  revalidateLand(String(before.land_id));
+  if (auditError) return fail(auditError);
+  return { ok: true, message: `Đã xóa khu vực "${before.name}"` };
+}
+
+// =============================================================================
 // XÓA VÙNG ĐẤT
 // =============================================================================
 
 /**
  * Xóa vĩnh viễn một vùng đất. Chỉ admin; phải gõ đúng slug để xác nhận.
- * Vùng đất còn khu vực, từ vựng hoặc tiến độ người chơi thì không xóa (database cũng chặn).
+ * Vùng đất còn khu vực thì không xóa (database cũng chặn bằng ON DELETE RESTRICT).
  */
 export async function deleteLand(id: string, confirmSlug: string): Promise<ActionResult> {
-  const denied = await guard(LAND_DELETERS);
+  const denied = await guard(DELETERS);
   if (denied) return fail(denied);
   if (!UUID.test(id)) return fail("Mã vùng đất không hợp lệ");
 
@@ -405,24 +421,20 @@ export async function deleteLand(id: string, confirmSlug: string): Promise<Actio
     return fail(`Gõ đúng slug "${before.slug}" để xác nhận xóa`);
   }
 
-  const [{ count: areaCount }, { count: wordCount }] = await Promise.all([
-    supabase.from("areas").select("id", { count: "exact", head: true }).eq("land_id", id),
-    supabase.from("words").select("id", { count: "exact", head: true }).eq("land_id", id),
-  ]);
-  if ((areaCount ?? 0) > 0 || (wordCount ?? 0) > 0) {
+  const { count: areaCount } = await supabase
+    .from("areas")
+    .select("id", { count: "exact", head: true })
+    .eq("land_id", id);
+  if ((areaCount ?? 0) > 0) {
     return fail(
-      `Vùng đất còn ${areaCount ?? 0} khu vực và ${wordCount ?? 0} từ vựng nên không xóa được. ` +
-        "Hãy tắt vùng đất để ẩn, hoặc chuyển / xóa nội dung bên trong trước.",
+      `Vùng đất còn ${areaCount} khu vực nên không xóa được. ` +
+        "Hãy xóa các khu vực trước, hoặc tắt vùng đất để ẩn.",
     );
   }
 
   const { data: deleted, error } = await supabase.from("lands").delete().eq("id", id).select("id");
   if (error) {
-    if (error.code === "23503") {
-      return fail(
-        "Vùng đất vẫn còn dữ liệu liên quan (khu vực, từ vựng hoặc tiến độ người chơi) nên không xóa được",
-      );
-    }
+    if (error.code === "23503") return fail("Vùng đất vẫn còn khu vực nên không xóa được");
     return fail(dbError(error, "Không xóa được vùng đất"));
   }
   if (!deleted || deleted.length === 0) return fail("Không xóa được vùng đất (không có quyền)");
@@ -431,4 +443,141 @@ export async function deleteLand(id: string, confirmSlug: string): Promise<Actio
   revalidateLand();
   if (auditError) return fail(auditError);
   return { ok: true, message: `Đã xóa vùng đất "${before.name}"` };
+}
+
+// =============================================================================
+// KỸ NĂNG LUYỆN TẬP
+// =============================================================================
+
+export async function createSkill(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const denied = await guard();
+  if (denied) return fail(denied);
+  const parsed = SkillInput.safeParse(input);
+  if (!parsed.success) return fail(firstIssue(parsed.error));
+
+  const supabase = await createClient();
+  // Kỹ năng mới đứng cuối danh sách.
+  const { data: last } = await supabase
+    .from("skills")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data, error } = await supabase
+    .from("skills")
+    .insert({ ...skillRow(parsed.data), sort_order: Number(last?.sort_order ?? -1) + 1 })
+    .select("*")
+    .single();
+  if (error || !data) return fail(dbError(error, "Không tạo được kỹ năng"));
+
+  const auditError = await audit({
+    action: "skills.create",
+    targetTable: "skills",
+    targetId: data.id,
+    after: data,
+  });
+  revalidateSkills();
+  if (auditError) return fail(auditError);
+  return { ok: true, message: `Đã tạo kỹ năng "${data.name}"`, data: { id: data.id } };
+}
+
+export async function updateSkill(id: string, input: unknown): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return fail(denied);
+  if (!UUID.test(id)) return fail("Mã kỹ năng không hợp lệ");
+  const parsed = SkillInput.safeParse(input);
+  if (!parsed.success) return fail(firstIssue(parsed.error));
+
+  const supabase = await createClient();
+  const { data: before } = await supabase.from("skills").select("*").eq("id", id).maybeSingle();
+  if (!before) return fail("Không tìm thấy kỹ năng");
+
+  const { data: after, error } = await supabase
+    .from("skills")
+    .update(skillRow(parsed.data))
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error || !after) return fail(dbError(error, "Không lưu được kỹ năng"));
+
+  const auditError = await audit({
+    action: "skills.update",
+    targetTable: "skills",
+    targetId: id,
+    before,
+    after,
+  });
+  revalidateSkills();
+  if (auditError) return fail(auditError);
+  return { ok: true, message: `Đã lưu kỹ năng "${after.name}"` };
+}
+
+export async function reorderSkills(ids: unknown): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return fail(denied);
+  const parsed = IdList.safeParse(ids);
+  if (!parsed.success) return fail(firstIssue(parsed.error));
+
+  const supabase = await createClient();
+  const { data: before, error: readError } = await supabase.from("skills").select("id").order("sort_order");
+  if (readError || !before) return fail(dbError(readError, "Không đọc được danh sách kỹ năng"));
+  // Phải gửi ĐỦ mọi kỹ năng, nếu không thứ tự mới sẽ lệch với kỹ năng không được gửi.
+  const current = new Set(before.map((row: Row) => String(row.id)));
+  if (current.size !== parsed.data.length || !parsed.data.every((id) => current.has(id))) {
+    return fail("Danh sách kỹ năng đã thay đổi. Tải lại trang rồi thử lại");
+  }
+
+  const { error } = await supabase.rpc("reorder_skills", { ids: parsed.data });
+  if (error) return fail(dbError(error, "Không đổi được thứ tự kỹ năng"));
+
+  const auditError = await audit({
+    action: "skills.reorder",
+    targetTable: "skills",
+    before: before.map((row: Row) => row.id),
+    after: parsed.data,
+  });
+  revalidateSkills();
+  if (auditError) return fail(auditError);
+  return { ok: true, message: "Đã đổi thứ tự kỹ năng" };
+}
+
+/**
+ * Xóa vĩnh viễn một kỹ năng. Chỉ admin; phải gõ đúng tên để xác nhận.
+ * Kỹ năng đang được khu vực dùng thì không xóa (database cũng chặn bằng ON DELETE RESTRICT).
+ */
+export async function deleteSkill(id: string, confirmName: string): Promise<ActionResult> {
+  const denied = await guard(DELETERS);
+  if (denied) return fail(denied);
+  if (!UUID.test(id)) return fail("Mã kỹ năng không hợp lệ");
+
+  const supabase = await createClient();
+  const { data: before } = await supabase.from("skills").select("*").eq("id", id).maybeSingle();
+  if (!before) return fail("Không tìm thấy kỹ năng");
+  if (typeof confirmName !== "string" || confirmName.trim() !== before.name) {
+    return fail(`Gõ đúng tên "${before.name}" để xác nhận xóa`);
+  }
+
+  const { count: areaCount } = await supabase
+    .from("areas")
+    .select("id", { count: "exact", head: true })
+    .eq("skill_id", id);
+  if ((areaCount ?? 0) > 0) {
+    return fail(
+      `Kỹ năng đang được ${areaCount} khu vực dùng nên không xóa được. ` +
+        "Hãy đổi kỹ năng của các khu vực đó trước.",
+    );
+  }
+
+  const { data: deleted, error } = await supabase.from("skills").delete().eq("id", id).select("id");
+  if (error) {
+    if (error.code === "23503") return fail("Kỹ năng vẫn đang được khu vực dùng nên không xóa được");
+    return fail(dbError(error, "Không xóa được kỹ năng"));
+  }
+  if (!deleted || deleted.length === 0) return fail("Không xóa được kỹ năng (không có quyền)");
+
+  const auditError = await audit({ action: "skills.delete", targetTable: "skills", targetId: id, before });
+  revalidateSkills();
+  if (auditError) return fail(auditError);
+  return { ok: true, message: `Đã xóa kỹ năng "${before.name}"` };
 }

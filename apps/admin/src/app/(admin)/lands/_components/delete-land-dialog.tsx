@@ -10,7 +10,7 @@ import { deleteLand } from "../actions";
 
 /**
  * Hộp xác nhận xóa vĩnh viễn vùng đất: phải gõ đúng slug.
- * Máy chủ và database vẫn tự chặn nếu vùng đất còn khu vực / từ vựng / dữ liệu người chơi.
+ * Máy chủ và database vẫn tự chặn nếu vùng đất còn khu vực.
  */
 export function DeleteLandDialog({
   land,

@@ -8,28 +8,7 @@
  * có route trong app mà chưa có trong tài liệu (hoặc ngược lại).
  */
 import { z } from "zod";
-import {
-  AdminMeResponse,
-  AdminStatsQuery,
-  AdminStatsResponse,
-  BuyRequest,
-  BuyResponse,
-  CatalogSeedsResponse,
-  ErrorResponse,
-  HarvestRequest,
-  HarvestResponse,
-  HealthResponse,
-  LessonParams,
-  LessonSubmitRequest,
-  LessonSubmitResponse,
-  MeResponse,
-  PlantRequest,
-  PlantResponse,
-  SellRequest,
-  SellResponse,
-  WaterRequest,
-  WaterResponse,
-} from "@lw/shared/api";
+import { AdminMeResponse, ErrorResponse, HealthResponse, MeResponse } from "@lw/shared/api";
 
 /** Ai được gọi route: không cần đăng nhập, người đã đăng nhập, hay nhân viên (admin/editor/moderator + TOTP). */
 type Access = "public" | "user" | "staff";
@@ -52,11 +31,7 @@ interface RouteDoc {
 
 const TAGS = {
   system: "Hệ thống",
-  catalog: "Danh mục",
   account: "Tài khoản",
-  farm: "Nông trại",
-  shop: "Cửa hàng",
-  lessons: "Bài học",
   admin: "Quản trị",
 } as const;
 
@@ -71,81 +46,11 @@ export const ROUTES: RouteDoc[] = [
   },
   {
     method: "get",
-    path: "/catalog/seeds",
-    tag: TAGS.catalog,
-    summary: "Danh sách hạt giống và bảng giá",
-    access: "public",
-    response: CatalogSeedsResponse,
-  },
-  {
-    method: "get",
     path: "/me",
     tag: TAGS.account,
     summary: "Người đang đăng nhập",
     access: "user",
     response: MeResponse,
-  },
-  {
-    method: "post",
-    path: "/farm/plant",
-    tag: TAGS.farm,
-    summary: "Gieo hạt vào ô đất",
-    access: "user",
-    body: PlantRequest,
-    response: PlantResponse,
-    notImplemented: true,
-  },
-  {
-    method: "post",
-    path: "/farm/water",
-    tag: TAGS.farm,
-    summary: "Tưới cây",
-    access: "user",
-    body: WaterRequest,
-    response: WaterResponse,
-    notImplemented: true,
-  },
-  {
-    method: "post",
-    path: "/farm/harvest",
-    tag: TAGS.farm,
-    summary: "Thu hoạch",
-    access: "user",
-    body: HarvestRequest,
-    response: HarvestResponse,
-    notImplemented: true,
-  },
-  {
-    method: "post",
-    path: "/shop/buy",
-    tag: TAGS.shop,
-    summary: "Mua vật phẩm",
-    description: "Giá đọc từ database, không nhận giá từ trình duyệt.",
-    access: "user",
-    body: BuyRequest,
-    response: BuyResponse,
-    notImplemented: true,
-  },
-  {
-    method: "post",
-    path: "/shop/sell",
-    tag: TAGS.shop,
-    summary: "Bán vật phẩm",
-    access: "user",
-    body: SellRequest,
-    response: SellResponse,
-    notImplemented: true,
-  },
-  {
-    method: "post",
-    path: "/lessons/{id}/submit",
-    tag: TAGS.lessons,
-    summary: "Nộp bài học",
-    access: "user",
-    params: LessonParams,
-    body: LessonSubmitRequest,
-    response: LessonSubmitResponse,
-    notImplemented: true,
   },
   {
     method: "get",
@@ -154,16 +59,6 @@ export const ROUTES: RouteDoc[] = [
     summary: "Nhân viên đang đăng nhập và vai trò",
     access: "staff",
     response: AdminMeResponse,
-  },
-  {
-    method: "get",
-    path: "/admin/stats",
-    tag: TAGS.admin,
-    summary: "Thống kê cho trang Tổng quan",
-    access: "staff",
-    query: AdminStatsQuery,
-    response: AdminStatsResponse,
-    notImplemented: true,
   },
 ];
 

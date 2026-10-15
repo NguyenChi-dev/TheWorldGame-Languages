@@ -79,8 +79,8 @@ select is((select role::text from public.profiles where id = 'c0000000-0000-4000
 select set_config('request.jwt.claims',
   '{"sub":"c0000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}', true);
 set local role authenticated;
-select throws_ok($$ update public.profiles set gold = 999999 where id = 'c0000000-0000-4000-8000-000000000004' $$,
-  '42501', null, 'admin không sửa được cột khác ngoài role (ví dụ vàng)');
+select throws_ok($$ update public.profiles set username = 'doi-ten' where id = 'c0000000-0000-4000-8000-000000000004' $$,
+  '42501', null, 'admin không sửa được cột khác ngoài role (ví dụ username)');
 select lives_ok($$ update public.profiles set role = 'player' where id = 'c0000000-0000-4000-8000-000000000001' $$,
   'admin tự đổi vai trò không lỗi nhưng...');
 select lives_ok($$ update public.profiles set role = 'moderator' where id = 'c0000000-0000-4000-8000-000000000004' $$,

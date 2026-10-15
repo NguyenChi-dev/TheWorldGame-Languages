@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { ADMIN_SECTIONS, SEED_LIST } from "@lw/shared";
-import { Panel } from "@lw/ui";
+import { ADMIN_SECTIONS } from "@lw/shared";
 import { PageTitle } from "@/components/page-title";
 import { requireSection } from "@/lib/auth";
 
@@ -12,34 +11,12 @@ export default async function EconomyPage() {
   return (
     <>
       <PageTitle>{ADMIN_SECTIONS.economy.label}</PageTitle>
-      <Panel title={`Hạt giống (${SEED_LIST.length})`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b text-slate-500">
-              <tr>
-                <th className="py-2 pr-4">Mã</th>
-                <th className="py-2 pr-4">Từ vựng</th>
-                <th className="py-2 pr-4">Giá mua</th>
-                <th className="py-2 pr-4">Giá bán nông sản</th>
-                <th className="py-2">Thời gian lớn</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SEED_LIST.map((seed) => (
-                <tr key={seed.id} className="border-b last:border-0">
-                  <td className="py-2 pr-4 font-mono text-slate-500">{seed.id}</td>
-                  <td className="py-2 pr-4">
-                    <span className="font-semibold">{seed.word}</span> ({seed.meaning})
-                  </td>
-                  <td className="py-2 pr-4">{seed.buyPrice} vàng</td>
-                  <td className="py-2 pr-4">{seed.sellPrice} vàng</td>
-                  <td className="py-2">{seed.growSeconds} giây</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+      <div className="rounded-2xl border-2 border-dashed border-primary/40 bg-white px-6 py-10 text-center">
+        <p className="font-semibold text-slate-700">Chưa có nội dung</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Chức năng quản lý vật phẩm và kinh tế sẽ được làm ở đây.
+        </p>
+      </div>
     </>
   );
 }

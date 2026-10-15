@@ -2,7 +2,8 @@
 
 Máy chủ **Hono** chạy trên **Node.js**, cổng **4000**.
 
-Đây là nơi **duy nhất** được thay đổi dữ liệu game: vàng, nông trại, mua bán, bài học.
+Đây là nơi **duy nhất** được thay đổi dữ liệu của người chơi khi game có các tính năng đó
+(hiện mới có kiểm tra máy chủ, tài khoản và quyền nhân viên; route game thêm dần khi làm tới phần nào).
 Web (`apps/web`), trang quản trị (`apps/admin`) và app điện thoại sau này đều gọi vào đây.
 Máy chủ realtime (`apps/realtime`) chỉ lo vị trí và chat, không đụng tới dữ liệu này.
 
@@ -47,43 +48,32 @@ Khi thiếu Supabase, máy chủ vẫn chạy và in cảnh báo; các route c�
 
 ## Danh sách route
 
-| Route                      | Đăng nhập | Trạng thái | Việc làm                                           |
-| -------------------------- | --------- | ---------- | -------------------------------------------------- |
-| `GET /api-docs`            | không     | chạy được  | Swagger UI (tắt bằng `API_DOCS=false`)             |
-| `GET /openapi.json`        | không     | chạy được  | Đặc tả OpenAPI 3.1                                 |
-| `GET /health`              | không     | chạy được  | `{ ok: true, service: "api", time }`               |
-| `GET /catalog/seeds`       | không     | chạy được  | `{ seeds: [...] }` lấy từ `@lw/shared`             |
-| `GET /me`                  | có        | chạy được  | `{ id, email }` của người đang đăng nhập           |
-| `POST /farm/plant`         | có        | khung, 501 | Gieo hạt `{ plotId, seedId }`                      |
-| `POST /farm/water`         | có        | khung, 501 | Tưới cây `{ plotId }`                              |
-| `POST /farm/harvest`       | có        | khung, 501 | Thu hoạch `{ plotId }` → `{ gold, inventory }`     |
-| `POST /shop/buy`           | có        | khung, 501 | Mua `{ itemId, quantity }` → `{ gold, inventory }` |
-| `POST /shop/sell`          | có        | khung, 501 | Bán `{ itemId, quantity }` → `{ gold, inventory }` |
-| `POST /lessons/:id/submit` | có        | khung, 501 | Nộp bài `{ answers: [{ wordId, answer }] }`        |
-| `GET /admin/me`            | nhân viên | chạy được  | `{ id, email, role }` của nhân viên đang đăng nhập |
-| `GET /admin/stats?days=7`  | nhân viên | khung, 501 | Thống kê cho trang quản trị                        |
+| Route               | Đăng nhập | Việc làm                                           |
+| ------------------- | --------- | -------------------------------------------------- |
+| `GET /api-docs`     | không     | Swagger UI (tắt bằng `API_DOCS=false`)             |
+| `GET /openapi.json` | không     | Đặc tả OpenAPI 3.1                                 |
+| `GET /health`       | không     | `{ ok: true, service: "api", time }`               |
+| `GET /me`           | có        | `{ id, email }` của người đang đăng nhập           |
+| `GET /admin/me`     | nhân viên | `{ id, email, role }` của nhân viên đang đăng nhập |
 
 Mọi lỗi đều có dạng `{ "error": "<thông báo tiếng Việt>" }`:
 
-| Mã  | Khi nào                                                             |
-| --- | ------------------------------------------------------------------- |
-| 400 | Dữ liệu gửi lên sai, ví dụ `"Dữ liệu gửi lên không hợp lệ: plotId"` |
-| 401 | Không có token, hoặc token sai/hết hạn                              |
-| 403 | Không phải nhân viên, token chưa qua TOTP, hoặc nguồn lạ (CORS)     |
-| 404 | Đường dẫn không tồn tại                                             |
-| 501 | Route mới có khung, chưa làm                                        |
-| 503 | Chưa cấu hình Supabase, hoặc không kết nối được Supabase            |
+| Mã  | Khi nào                                                           |
+| --- | ----------------------------------------------------------------- |
+| 400 | Dữ liệu gửi lên sai, ví dụ `"Dữ liệu gửi lên không hợp lệ: name"` |
+| 401 | Không có token, hoặc token sai/hết hạn                            |
+| 403 | Không phải nhân viên, token chưa qua TOTP, hoặc nguồn lạ (CORS)   |
+| 404 | Đường dẫn không tồn tại                                           |
+| 501 | Route mới có khung, chưa làm                                      |
+| 503 | Chưa cấu hình Supabase, hoặc không kết nối được Supabase          |
 
 ### Thử bằng curl
 
 ```bash
 curl http://localhost:4000/health
-curl http://localhost:4000/catalog/seeds
 curl http://localhost:4000/me                                  # 401 Chưa đăng nhập
 curl -H "Authorization: Bearer <access_token>" http://localhost:4000/me
-curl -X POST http://localhost:4000/farm/harvest \
-  -H "Authorization: Bearer <access_token>" -H "Content-Type: application/json" \
-  -d '{"plotId":"33333333-3333-4333-8333-333333333333"}'       # 501 Chưa làm
+curl -H "Authorization: Bearer <access_token>" http://localhost:4000/admin/me   # 403 nếu không phải nhân viên
 ```
 
 `<access_token>` là token đăng nhập Supabase của người chơi (khi có trang đăng nhập, `apps/web`
@@ -98,7 +88,7 @@ src/
 ├── openapi.ts          tài liệu OpenAPI (Swagger) sinh từ schema Zod, mỗi route 1 dòng trong ROUTES
 ├── env.ts              đọc và kiểm tra biến môi trường bằng Zod
 ├── routes/             mỗi file một nhóm đường dẫn; chỉ nhận yêu cầu và trả kết quả
-├── services/           logic nghiệp vụ (tính toán, quy tắc game), không biết gì về HTTP
+├── services/           (tạo khi cần) logic nghiệp vụ, không biết gì về HTTP
 ├── middleware/
 │   ├── auth.ts         kiểm tra token Supabase, gắn user vào context: c.get("user")
 │   └── require-role.ts requireRole([...]): đọc profiles.role, bắt buộc token đã qua TOTP (aal2)
@@ -113,34 +103,35 @@ Schema Zod và kiểu dữ liệu của từng route **không** viết ở đây
 
 ## Thêm một route mới
 
-Ví dụ thêm `POST /shop/gift` để tặng vật phẩm cho bạn:
+Ví dụ thêm `GET /lands` để game đọc danh sách vùng đất đang bật:
 
 **1. Khai báo dữ liệu trong `packages/shared/src/api.ts`:**
 
 ```ts
-export const GiftRequest = z.object({ toPlayerId: z.uuid(), itemId: z.string(), quantity: Quantity });
-export type GiftRequest = z.infer<typeof GiftRequest>;
-export const GiftResponse = z.object({ inventory: z.array(InventoryEntry) });
-export type GiftResponse = z.infer<typeof GiftResponse>;
+export const LandsResponse = z.object({
+  lands: z.array(z.object({ id: z.string(), slug: z.string(), name: z.string() })),
+});
+export type LandsResponse = z.infer<typeof LandsResponse>;
 ```
 
-**2. Viết logic trong `src/services/shop.service.ts`** (hàm thường, nhận dữ liệu, trả kết quả):
+**2. Viết logic trong `src/services/lands.service.ts`** (hàm thường, nhận dữ liệu, trả kết quả):
 
 ```ts
-export async function giftItem(fromUserId: string, input: GiftRequest): Promise<GiftResponse> {
-  // kiểm tra túi đồ, trừ của người tặng, cộng cho người nhận...
+export async function listActiveLands(): Promise<LandsResponse> {
+  // đọc bảng lands (is_active = true), sắp theo sort_order...
 }
 ```
 
-**3. Gắn route trong `src/routes/shop.ts`:**
+**3. Gắn route trong `src/routes/lands.ts`:**
 
 ```ts
-.post("/gift", validate("json", GiftRequest), async (c) => {
-  const input = c.req.valid("json");             // đã kiểm tra, đúng kiểu
-  const result = await giftItem(c.get("user").id, input); // user id lấy từ TOKEN, không lấy từ body
-  return c.json(result satisfies GiftResponse);
-})
+export const landRoutes = new Hono().get("/", async (c) =>
+  c.json((await listActiveLands()) satisfies LandsResponse),
+);
 ```
+
+Route nhận dữ liệu gửi lên thì kiểm tra bằng `validate("json", Schema)`, và user id **luôn** lấy từ
+token (`c.get("user").id`), không lấy từ nội dung yêu cầu.
 
 Nếu là nhóm đường dẫn mới (file mới trong `routes/`), nhớ gắn nó trong `src/app.ts`:
 `app.route("/ten-nhom", tenNhomRoutes)`.
@@ -148,7 +139,7 @@ Nếu là nhóm đường dẫn mới (file mới trong `routes/`), nhớ gắn 
 **4. Thêm hàm gọi trong `apps/web/src/lib/api.ts`:**
 
 ```ts
-gift: (body: GiftRequest) => apiFetch<GiftResponse>("/shop/gift", { method: "POST", body }),
+lands: () => apiFetch<LandsResponse>("/lands", { auth: false }),
 ```
 
 **5. Thêm vào tài liệu Swagger:** 1 dòng trong `ROUTES` của `src/openapi.ts`.
@@ -158,7 +149,7 @@ gift: (body: GiftRequest) => apiFetch<GiftResponse>("/shop/gift", { method: "POS
 Quy tắc khi viết route:
 
 - User id **luôn** lấy từ `c.get("user").id`, không bao giờ từ nội dung yêu cầu.
-- Giá tiền, thời gian lớn, đáp án đúng: **đọc từ database hoặc `@lw/shared`**, không nhận từ trình duyệt.
+- Giá tiền, thời gian, đáp án đúng: **đọc từ database**, không nhận từ trình duyệt.
 - Thời gian: dùng **giờ máy chủ** (`new Date()` trên máy chủ, hoặc `now()` trong SQL).
 - Khóa bí mật bỏ qua RLS, nên mọi truy vấn dữ liệu người chơi phải tự lọc `.eq("user_id", user.id)`.
 - Muốn báo lỗi cho người dùng: `throw new ApiError(400, "Thông báo tiếng Việt")`.
@@ -168,24 +159,22 @@ Quy tắc khi viết route:
 
 Dùng **Vitest**. File test đặt cạnh file được test, tên kết thúc bằng `.test.ts`.
 
-| File                                | Kiểm tra gì                                                         |
-| ----------------------------------- | ------------------------------------------------------------------- |
-| `src/services/farm.service.test.ts` | Hàm `isReady` thuần: cây chín đúng lúc, nhận chuỗi ISO, dữ liệu lỗi |
-| `src/app.test.ts`                   | Gọi route thật bằng `app.request()`: health, 401, 503, CORS, 404    |
-| `src/routes/routes.test.ts`         | Thay Supabase bằng bản giả (`vi.mock`) để thử token, 400, 403, 501  |
-| `src/openapi.test.ts`               | Tài liệu Swagger khớp đủ route thật, `/api-docs` chạy, tắt được     |
+| File                        | Kiểm tra gì                                                      |
+| --------------------------- | ---------------------------------------------------------------- |
+| `src/app.test.ts`           | Gọi route thật bằng `app.request()`: health, 401, 503, CORS, 404 |
+| `src/routes/routes.test.ts` | Thay Supabase bằng bản giả (`vi.mock`) để thử token, 401, 403    |
+| `src/openapi.test.ts`       | Tài liệu Swagger khớp đủ route thật, `/api-docs` chạy, tắt được  |
 
 Một test cơ bản:
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { isReady } from "./farm.service";
+import { app } from "./app";
 
-describe("isReady", () => {
-  it("chín đúng lúc đủ thời gian", () => {
-    const planted = new Date("2026-01-01T08:00:00Z");
-    const now = new Date("2026-01-01T08:01:00Z"); // 60 giây sau
-    expect(isReady(planted, 60, now)).toBe(true);
+describe("GET /health", () => {
+  it("trả về ok", async () => {
+    const res = await app.request("/health");
+    expect(res.status).toBe(200);
   });
 });
 ```

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { requireSection } from "@/lib/auth";
-import { coverUrlOf, embeddedCount, getLand, toArea } from "@/lib/content";
+import { coverUrlOf, getLand, getSkills, toArea } from "@/lib/content";
 import { createClient } from "@/lib/supabase/server";
 import { AreasManager } from "../_components/areas-manager";
 import { LandInfo } from "../_components/land-info";
@@ -14,28 +14,25 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: land.name };
 }
 
-/** /lands/[landId]: băng thông tin vùng đất (sửa / xóa được) + danh sách khu vực. Dùng chung quyền của /lands. */
+/** /lands/[landId]: thẻ vùng đất (sửa / xóa được) + danh sách khu vực (thêm / sửa / xóa / đổi thứ tự). Dùng chung quyền của /lands. */
 export default async function LandPage({ params }: { params: Params }) {
   const session = await requireSection("lands");
   const { landId } = await params;
   const land = await getLand(landId);
 
   const supabase = await createClient();
-  const [{ data: coverRow }, { data, error }] = await Promise.all([
+  const [{ data: coverRow }, { data, error }, skills] = await Promise.all([
     supabase.from("lands").select("cover:media(secure_url)").eq("id", land.id).maybeSingle(),
     supabase
       .from("areas")
-      .select("*, cover:media(secure_url), lessons(count)")
+      .select("*, cover:media(secure_url)")
       .eq("land_id", land.id)
       .order("unlock_order")
       .order("name"),
+    getSkills(),
   ]);
   if (error) throw new Error(`Không đọc được danh sách khu vực: ${error.message}`);
-  const rows = data.map((row) => ({
-    area: toArea(row),
-    lessonCount: embeddedCount(row.lessons),
-    coverUrl: coverUrlOf(row),
-  }));
+  const rows = data.map((row) => ({ area: toArea(row), coverUrl: coverUrlOf(row) }));
 
   return (
     <>
@@ -50,7 +47,7 @@ export default async function LandPage({ params }: { params: Params }) {
             canDelete={session.role === "admin"}
           />
         </aside>
-        <AreasManager landId={land.id} rows={rows} />
+        <AreasManager landId={land.id} rows={rows} skills={skills} canDelete={session.role === "admin"} />
       </div>
     </>
   );

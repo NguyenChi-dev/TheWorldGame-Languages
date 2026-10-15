@@ -1,11 +1,11 @@
 -- Test: bảng media (ảnh Cloudinary) và chức năng XÓA vùng đất.
 --   - Ai cũng đọc được media; chỉ admin/editor thêm được; người chơi không.
 --   - Xóa media thì ảnh bìa của vùng đất tự về null.
---   - Chỉ admin xóa được vùng đất, và chỉ khi vùng đất không còn khu vực / từ vựng (RESTRICT).
+--   - Chỉ admin xóa được vùng đất, và chỉ khi vùng đất không còn khu vực (RESTRICT).
 -- Chạy: pnpm supabase test db   (mọi thay đổi bị rollback cuối file)
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(14);
+select plan(13);
 
 update public.admin_settings set require_mfa = true;
 
@@ -18,12 +18,9 @@ update public.profiles set role = 'editor' where id = '8a000000-0000-4000-8000-0
 
 insert into public.lands (id, slug, language_code, name) values
   ('8b000000-0000-4000-8000-000000000001', 'mx-trong',   'qa', 'Vùng trống'),
-  ('8b000000-0000-4000-8000-000000000002', 'mx-co-khu',  'qb', 'Vùng có khu vực'),
-  ('8b000000-0000-4000-8000-000000000003', 'mx-co-tu',   'qc', 'Vùng có từ vựng');
-insert into public.areas (land_id, name, scene, skill, unlock_order) values
-  ('8b000000-0000-4000-8000-000000000002', 'Khu', 'farm', 'vocabulary', 0);
-insert into public.words (id, land_id, word, meaning) values
-  ('mx-word', '8b000000-0000-4000-8000-000000000003', 'word', 'từ');
+  ('8b000000-0000-4000-8000-000000000002', 'mx-co-khu',  'qb', 'Vùng có khu vực');
+insert into public.areas (land_id, name, scene, skill_id, unlock_order) values
+  ('8b000000-0000-4000-8000-000000000002', 'Khu', 'farm', (select id from public.skills where name = 'Từ vựng'), 0);
 
 
 -- ================================================================= editor: thêm media, gắn làm ảnh bìa
@@ -77,8 +74,6 @@ select set_config('request.jwt.claims',
 set local role authenticated;
 select throws_ok($$ delete from public.lands where id = '8b000000-0000-4000-8000-000000000002' $$,
   '23503', null, 'admin không xóa được vùng đất còn khu vực');
-select throws_ok($$ delete from public.lands where id = '8b000000-0000-4000-8000-000000000003' $$,
-  '23503', null, 'admin không xóa được vùng đất còn từ vựng');
 select lives_ok($$ delete from public.lands where id = '8b000000-0000-4000-8000-000000000001' $$,
   'admin xóa được vùng đất trống');
 -- Xóa media: ảnh bìa (nếu còn vùng nào dùng) tự về null, không lỗi.

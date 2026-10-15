@@ -17,6 +17,16 @@ export interface SidebarItem {
   label: string;
   /** Nhóm trên thanh bên (Nội dung học, Kinh tế, Vận hành); null = không thuộc nhóm (Tổng quan). */
   group: AdminSectionGroup | null;
+  /** Mục con, hiện ra bên dưới khi đang ở trong mục này (ví dụ Vùng đất › Kỹ năng luyện tập). */
+  children?: readonly { href: string; label: string }[];
+}
+
+/** Mục con đang mở: mục có đường dẫn khớp dài nhất (/lands/skills thắng /lands). */
+function activeChildHref(children: readonly { href: string }[], pathname: string): string | null {
+  const matches = children
+    .map((child) => child.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`));
+  return matches.sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
 function SignOutButton() {
@@ -117,7 +127,7 @@ export function Sidebar({
               ) : null}
               <Link
                 href={item.href}
-                aria-current={active ? "page" : undefined}
+                aria-current={active && !item.children ? "page" : undefined}
                 title={collapsed ? item.label : undefined}
                 className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   collapsed ? "md:justify-center md:px-0" : ""
@@ -130,6 +140,28 @@ export function Sidebar({
                 <Icon className={`size-4.5 shrink-0 ${active ? "text-accent" : "text-slate-400"}`} />
                 <span className={hideWhenCollapsed}>{item.label}</span>
               </Link>
+              {/* Mục con: chỉ hiện khi đang ở trong mục cha và thanh bên không thu gọn. */}
+              {active && item.children && !collapsed ? (
+                <div className="flex shrink-0 gap-1 md:ml-5 md:flex-col md:border-l md:border-secondary md:pl-2">
+                  {item.children.map((child) => {
+                    const childActive = activeChildHref(item.children ?? [], pathname) === child.href;
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        aria-current={childActive ? "page" : undefined}
+                        className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                          childActive
+                            ? "bg-secondary/70 font-semibold text-accent"
+                            : "text-slate-500 hover:bg-background hover:text-slate-900"
+                        }`}
+                      >
+                        {child.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
             </Fragment>
           );
         })}

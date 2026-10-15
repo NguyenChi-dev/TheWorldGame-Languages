@@ -1,12 +1,12 @@
 /**
- * Schema Zod cho dữ liệu admin GỬI LÊN khi tạo/sửa Vùng đất và Khu vực.
+ * Schema Zod cho dữ liệu admin GỬI LÊN khi tạo/sửa Vùng đất, Khu vực và Kỹ năng luyện tập.
  * apps/admin (server action) dùng để kiểm tra; game/app khác dùng chung cùng quy tắc.
  *
  * Nhập từ "@lw/shared/schemas" (không phải "@lw/shared") để gói khác không phải kéo theo Zod.
  */
 import { z } from "zod";
 import { LANGUAGE_CODE_PATTERN, SLUG_PATTERN } from "./slug";
-import { AREA_SCENES, SKILLS } from "./world";
+import { AREA_SCENES, SKILL_COLOR_KEYS, SKILL_ICON_KEYS } from "./world";
 
 const optionalMediaId = z
   .union([z.uuid({ error: "Mã ảnh bìa phải là UUID" }), z.literal(""), z.null()])
@@ -34,15 +34,21 @@ export type LandInputParsed = z.output<typeof LandInput>;
 
 export const AreaInput = z.object({
   name: z.string().trim().min(1, "Nhập tên khu vực").max(80, "Tên tối đa 80 ký tự"),
-  skill: z.enum(SKILLS, { error: "Chọn kỹ năng" }),
+  skillId: z.uuid({ error: "Chọn kỹ năng" }),
   scene: z.enum(AREA_SCENES, { error: "Chọn mẫu cảnh" }),
   coverMediaId: optionalMediaId,
-  unlockRequirement: z
-    .record(z.string(), z.unknown(), { error: "Điều kiện mở khóa phải là đối tượng JSON" })
-    .default({}),
 });
 export type AreaInput = z.input<typeof AreaInput>;
 export type AreaInputParsed = z.output<typeof AreaInput>;
+
+export const SkillInput = z.object({
+  name: z.string().trim().min(1, "Nhập tên kỹ năng").max(60, "Tên tối đa 60 ký tự"),
+  description: z.string().trim().max(300, "Mô tả tối đa 300 ký tự").default(""),
+  icon: z.enum(SKILL_ICON_KEYS, { error: "Chọn icon" }),
+  color: z.enum(SKILL_COLOR_KEYS, { error: "Chọn màu" }),
+});
+export type SkillInput = z.input<typeof SkillInput>;
+export type SkillInputParsed = z.output<typeof SkillInput>;
 
 /** Danh sách id để đổi thứ tự: UUID, không trùng. */
 export const IdList = z

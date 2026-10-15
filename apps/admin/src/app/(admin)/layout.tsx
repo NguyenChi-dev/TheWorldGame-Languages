@@ -18,11 +18,12 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
   return (
     <div className="min-h-dvh bg-background md:flex">
       <Sidebar
-        items={sectionsForRole(session.role).map(({ key, href, label, group }) => ({
-          key,
-          href,
-          label,
-          group,
+        items={sectionsForRole(session.role).map((section) => ({
+          key: section.key,
+          href: section.href,
+          label: section.label,
+          group: section.group,
+          children: "children" in section ? section.children : undefined,
         }))}
         email={session.email}
         roleLabel={ROLE_LABELS[session.role]}
