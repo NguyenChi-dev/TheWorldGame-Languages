@@ -1,7 +1,14 @@
 @import "tailwindcss";
 
-/* Cho Tailwind quét class trong các component dùng chung ở packages/ui */
+/* Cho Tailwind quét class trong các component dùng chung ở packages/ui. */
 @source "../../../../packages/ui/src";
+
+@theme {
+  /* Font kiểu game, tròn và dày (Baloo 2, nạp bằng next/font ở app/layout.tsx). */
+  --font-game: var(--font-baloo), ui-rounded, "Segoe UI", system-ui, sans-serif;
+  /* Font khối góc cạnh kiểu 3D low-poly (Bungee), cho tiêu đề và nút. */
+  --font-poly: var(--font-bungee), "Arial Black", Impact, sans-serif;
+}
 
 :root {
   color-scheme: light;
@@ -9,4 +16,842 @@
 
 body {
   @apply bg-emerald-50 text-slate-900 antialiased;
+}
+
+/* -----------------------------------------------------------------------------
+ * Hiệu ứng trang chủ (components/home/home-hero.tsx)
+ *
+ * Để mượt (60 khung hình/giây), hiệu ứng chạy liên tục CHỈ đổi transform / opacity: trình duyệt
+ * đưa phần tử lên lớp riêng (will-change) và di chuyển bằng GPU, không phải vẽ lại. Không dùng
+ * backdrop-blur đè lên ảnh nền đang chuyển động, không animate box-shadow, left, background-position.
+ * -------------------------------------------------------------------------- */
+
+/* Ảnh nền nghiêng nhẹ ngược hướng chuột (--px, --py từ -0.5 đến 0.5). */
+.home-parallax {
+  transform: translate3d(calc(var(--px, 0) * -24px), calc(var(--py, 0) * -16px), 0);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* Phóng to / thu nhỏ rất chậm, như máy quay lướt qua thế giới. */
+.home-kenburns {
+  animation: home-kenburns 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes home-kenburns {
+  from {
+    transform: scale(1.04) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.14) translate3d(-1.5%, -1%, 0);
+  }
+}
+
+/*
+ * Chữ kiểu 3D low-poly, 2 lớp:
+ *   - Chính chữ: màu tím đậm + bóng xếp tầng = phần "khối" đùn ra phía sau.
+ *   - ::after (data-char): mặt trước, tô bằng các mảng tam giác (gradient cắt cứng theo 2 hướng ±60°
+ *     chồng lên nền vàng → cam → hồng), giống bề mặt đa giác của mô hình low-poly.
+ * Từng chữ chỉ nảy lên MỘT lần lúc vào trang; sau đó cả dòng tiêu đề (.home-title) nhấp nhô như
+ * một khối, nên chữ không phải vẽ lại liên tục.
+ */
+.home-title {
+  animation: home-title-bob 3.2s ease-in-out 2.2s infinite;
+  will-change: transform;
+}
+@keyframes home-title-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.home-letter {
+  position: relative;
+  color: #4c1d95;
+  -webkit-text-stroke: 0.06em #3b0764;
+  paint-order: stroke fill;
+  text-shadow:
+    0.02em 0.04em 0 #5b21b6,
+    0.04em 0.08em 0 #4c1d95,
+    0.06em 0.12em 0 #3b0764,
+    0.08em 0.16em 0 #2e1065,
+    0 0.3em 0.35em rgba(30, 27, 75, 0.45);
+  animation: home-letter-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.home-letter::after {
+  content: attr(data-char);
+  position: absolute;
+  inset: 0;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  color: transparent;
+  background-image:
+    linear-gradient(
+      60deg,
+      rgba(255, 255, 255, 0.55) 0 22%,
+      transparent 22% 48%,
+      rgba(255, 255, 255, 0.25) 48% 70%,
+      transparent 70%
+    ),
+    linear-gradient(-60deg, rgba(120, 53, 15, 0.18) 0 30%, transparent 30% 62%, rgba(157, 23, 77, 0.22) 62%),
+    linear-gradient(0deg, transparent 0 55%, rgba(255, 255, 255, 0.18) 55% 56%, transparent 56%),
+    linear-gradient(180deg, #fef3c7 0%, #fcd34d 30%, #fb923c 62%, #ec4899 100%);
+  background-size:
+    0.9em 0.9em,
+    1.1em 1.1em,
+    100% 100%,
+    100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@keyframes home-letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(-60px) scale(0.4) rotate(-12deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Bảng giới thiệu kiểu game: nền trắng ngà có các mảng tam giác mờ (low-poly), viền trắng dày,
+ * đáy tím đậm như một khối dày (giống tiêu đề và nút). Không đặt hiệu ứng chạy liên tục để khỏi giật.
+ */
+.home-intro {
+  background:
+    linear-gradient(
+      60deg,
+      rgba(255, 255, 255, 0.7) 0 18%,
+      transparent 18% 50%,
+      rgba(245, 243, 255, 0.8) 50% 68%,
+      transparent 68%
+    ),
+    linear-gradient(-60deg, transparent 0 40%, rgba(253, 242, 248, 0.9) 40% 58%, transparent 58%),
+    linear-gradient(180deg, #ffffff 0%, #faf5ff 100%);
+  background-size:
+    5rem 5rem,
+    6rem 6rem,
+    100% 100%;
+  border: 3px solid #fff;
+  box-shadow:
+    0 6px 0 #7c3aed,
+    0 10px 0 #4c1d95,
+    0 22px 30px -12px rgba(46, 16, 101, 0.55);
+}
+
+/* Viên đá đa giác (hình thoi cắt 4 mặt) gắn ở hai đầu bảng. */
+.home-gem {
+  width: 1.75rem;
+  height: 1.75rem;
+  rotate: 45deg;
+  border-radius: 0.3rem;
+  background: conic-gradient(from 45deg, #fde68a 0 25%, #fb923c 0 50%, #ec4899 0 75%, #fbbf24 0);
+  box-shadow:
+    0 0 0 3px #fff,
+    3px 3px 0 3px #4c1d95;
+}
+
+/* Hiện dần từ dưới lên. */
+.home-fade-up {
+  animation: home-fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes home-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Nút Chơi game: vòng sáng tỏa ra phía sau nút + vệt sáng quét ngang. */
+.home-halo {
+  animation: home-halo 2.4s ease-out 2.2s infinite;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+@keyframes home-halo {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25, 1.6);
+  }
+}
+.home-shine {
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  transform: translateX(-150%) skewX(-20deg);
+  animation: home-shine 3.2s ease-in-out 2s infinite;
+  will-change: transform;
+}
+@keyframes home-shine {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  45%,
+  100% {
+    transform: translateX(450%) skewX(-20deg);
+  }
+}
+
+/* Cánh hoa anh đào rơi, vừa rơi vừa lắc và xoay. */
+.home-petal {
+  border-radius: 80% 0 80% 0;
+  background: linear-gradient(135deg, #fff1f5, #f9a8d4);
+  box-shadow: 0 1px 3px rgba(190, 24, 93, 0.25);
+  opacity: 0;
+  animation-name: home-petal;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+@keyframes home-petal {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  10% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate3d(var(--drift, 60px), 55vh, 0) rotate(220deg);
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(var(--drift, 60px) * -0.4), 110vh, 0) rotate(460deg);
+  }
+}
+
+/* Đốm sáng lấp lánh. */
+.home-sparkle {
+  box-shadow:
+    0 0 8px 2px rgba(255, 255, 255, 0.9),
+    0 0 18px 6px rgba(253, 230, 138, 0.5);
+  opacity: 0;
+  animation: home-sparkle 3.6s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+@keyframes home-sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+ * Bảng gỗ kiểu 3D low-poly (components/auth/wood-board.tsx, auth-panel.tsx, nút gỗ ở trang chủ)
+ * -------------------------------------------------------------------------- */
+
+/* Đường viền gãy khúc (đa giác) dùng chung cho mặt bảng và phần độ dày phía sau. */
+.wood-board-face,
+.wood-board-depth {
+  clip-path: polygon(
+    3% 0%,
+    50% 1.2%,
+    97% 0%,
+    100% 3.5%,
+    99% 50%,
+    100% 96.5%,
+    96.5% 100%,
+    50% 98.8%,
+    3.5% 100%,
+    0% 96%,
+    1% 50%,
+    0% 4%
+  );
+}
+
+/* Độ dày tấm gỗ: lệch xuống dưới, màu sẫm. */
+.wood-board-depth {
+  transform: translateY(14px);
+  background: linear-gradient(180deg, #6b3d17 0%, #4a2a10 100%);
+  filter: drop-shadow(0 18px 24px rgba(30, 15, 5, 0.45));
+}
+
+/* Mặt gỗ: mảng tam giác sáng / tối (low-poly) + rãnh giữa các tấm ván + vân gỗ + màu nền. */
+.wood-board-face {
+  background:
+    linear-gradient(
+      125deg,
+      rgba(255, 236, 200, 0.22) 0 18%,
+      transparent 18% 44%,
+      rgba(255, 236, 200, 0.1) 44% 58%,
+      transparent 58%
+    ),
+    linear-gradient(
+      -35deg,
+      rgba(70, 30, 5, 0.16) 0 22%,
+      transparent 22% 52%,
+      rgba(70, 30, 5, 0.1) 52% 74%,
+      transparent 74%
+    ),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 70px,
+      rgba(60, 26, 6, 0.6) 70px 73px,
+      rgba(255, 220, 170, 0.18) 73px 75px
+    ),
+    repeating-linear-gradient(93deg, rgba(90, 45, 10, 0.1) 0 2px, transparent 2px 13px),
+    linear-gradient(180deg, #d0904d 0%, #b77537 55%, #a2622a 100%);
+  background-size:
+    240px 200px,
+    280px 230px,
+    100% 100%,
+    100% 100%,
+    100% 100%;
+  box-shadow:
+    inset 0 4px 0 rgba(255, 230, 190, 0.45),
+    inset 0 -6px 0 rgba(70, 35, 8, 0.35);
+}
+
+/* Đinh tán lục giác bằng sắt. */
+.wood-nail {
+  width: 14px;
+  height: 14px;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: conic-gradient(from 30deg, #e5e7eb 0 33%, #9ca3af 0 66%, #6b7280 0);
+}
+
+/* Dây thừng treo bảng: sọc xoắn chéo, kéo dài lên tận mép trên màn hình. */
+.wood-rope {
+  position: absolute;
+  bottom: calc(100% - 10px);
+  width: 8px;
+  height: 100vh;
+  border-radius: 4px;
+  background: repeating-linear-gradient(-55deg, #d6b07a 0 5px, #a77b45 5px 9px);
+  box-shadow: inset -2px 0 0 rgba(70, 40, 10, 0.35);
+}
+
+/* Bảng rơi xuống lúc vào trang (nảy nhẹ), sau đó đung đưa quanh điểm treo phía trên. */
+.wood-swing {
+  transform-origin: 50% -100px;
+  animation:
+    wood-drop 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    wood-sway 6s ease-in-out 1s infinite;
+  will-change: transform;
+}
+@keyframes wood-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-110vh) rotate(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes wood-sway {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(0.8deg);
+  }
+  75% {
+    transform: rotate(-0.8deg);
+  }
+}
+
+/* Chữ khắc trên gỗ: màu kem, bóng nâu sẫm xếp tầng. */
+.wood-carve {
+  color: #fff4dc;
+  text-shadow:
+    0 2px 0 #7a4316,
+    0 4px 0 #5a2f0c,
+    0 7px 10px rgba(40, 18, 4, 0.5);
+}
+.wood-label {
+  color: #fff0d2;
+  text-shadow: 0 1px 0 rgba(60, 26, 6, 0.85);
+}
+
+/* Ô nhập nền giấy da, lõm vào mặt gỗ. */
+.wood-input {
+  background: linear-gradient(180deg, #fff3dc, #fbe7c4);
+  border: 2px solid #6b3d17;
+  box-shadow:
+    inset 0 3px 0 rgba(120, 70, 25, 0.25),
+    0 2px 0 rgba(255, 230, 190, 0.35);
+}
+.wood-input:focus {
+  border-color: #f59e0b;
+  box-shadow:
+    inset 0 3px 0 rgba(120, 70, 25, 0.2),
+    0 0 0 4px rgba(251, 191, 36, 0.45);
+}
+
+/*
+ * Tab Đăng nhập / Tạo tài khoản: rãnh gỗ sẫm (lõm) + 1 tấm ván sáng trượt qua lại dưới tab đang chọn.
+ * Chỉ trượt bằng transform nên mượt (không vẽ lại).
+ */
+.wood-tab-track {
+  position: relative;
+  border-radius: 0.95rem;
+  padding: 4px;
+  background: linear-gradient(180deg, #6e3f18, #5a3212);
+  box-shadow:
+    inset 0 3px 0 rgba(40, 18, 4, 0.5),
+    0 1px 0 rgba(255, 228, 180, 0.35);
+}
+.wood-tab-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.45) 0 28%, transparent 28%),
+    linear-gradient(180deg, #ffe7b8, #f5c876);
+  box-shadow:
+    0 4px 0 #7a4316,
+    inset 0 2px 0 rgba(255, 255, 255, 0.7);
+  transition: transform 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+  will-change: transform;
+}
+.wood-tab-indicator[data-tab="signup"] {
+  transform: translateX(100%);
+}
+.wood-tab {
+  position: relative;
+  z-index: 1;
+  color: #f5dfba;
+  text-shadow: 0 1px 0 rgba(40, 18, 4, 0.6);
+  transition:
+    color 0.3s,
+    transform 0.3s;
+}
+.wood-tab:hover {
+  color: #fff;
+}
+.wood-tab[aria-selected="true"] {
+  color: #5a2f0c;
+  text-shadow: none;
+  transform: translateY(-2px);
+}
+.wood-tab:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+  border-radius: 0.75rem;
+}
+
+/* Tiêu đề lật như tấm biển xoay khi đổi tab. */
+.sign-flip {
+  animation: sign-flip 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  transform-origin: 50% 60%;
+}
+@keyframes sign-flip {
+  from {
+    opacity: 0;
+    transform: perspective(600px) rotateX(-90deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Nội dung form trượt vào theo hướng của tab (sang phải: vào từ bên phải, và ngược lại). */
+.tab-slide-next {
+  animation: tab-slide-next 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.tab-slide-prev {
+  animation: tab-slide-prev 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes tab-slide-next {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tab-slide-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Khung form co giãn chiều cao mượt khi đổi giữa form ngắn (đăng nhập) và form dài (tạo tài khoản). */
+.tab-panel {
+  transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* -----------------------------------------------------------------------------
+ * Nút "thật": có độ dày (cạnh dưới đậm bằng box-shadow), mặt bóng (vệt sáng ::before), viền tối.
+ * Rê chuột thì nổi lên, bấm thì lún xuống (cạnh dày ngắn lại) như nút bấm thật.
+ * Chỉ đổi transform / box-shadow lúc tương tác, không có hiệu ứng chạy liên tục.
+ * -------------------------------------------------------------------------- */
+
+/* Nút xanh lá (Vào game / Tạo tài khoản) trên bảng gỗ. */
+.wood-submit {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(20, 83, 45, 0.75);
+  background: linear-gradient(180deg, #bef264 0%, #4ade80 42%, #16a34a 100%);
+  border: 2px solid #14532d;
+  box-shadow:
+    0 6px 0 #166534,
+    0 12px 18px -6px rgba(20, 83, 45, 0.65),
+    inset 0 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.12);
+  transition:
+    transform 0.1s ease-out,
+    box-shadow 0.1s ease-out,
+    filter 0.15s;
+}
+.wood-submit::before,
+.play-btn::before {
+  /* Vệt bóng phía trên mặt nút. */
+  content: "";
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 4px;
+  height: 42%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.05));
+  pointer-events: none;
+}
+.wood-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow:
+    0 8px 0 #166534,
+    0 16px 22px -6px rgba(20, 83, 45, 0.65),
+    inset 0 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.12);
+}
+.wood-submit:active:not(:disabled) {
+  transform: translateY(5px);
+  box-shadow:
+    0 1px 0 #166534,
+    0 3px 6px -2px rgba(20, 83, 45, 0.6),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+}
+.wood-submit:disabled {
+  filter: grayscale(0.4);
+  cursor: wait;
+}
+.wood-submit:focus-visible {
+  outline: 4px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 3px;
+}
+/* Icon trong vòng tròn sáng bên trái chữ. */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.12),
+    0 2px 0 rgba(0, 0, 0, 0.15);
+  text-shadow: none;
+  font-size: 0.85em;
+}
+
+/* Nút lớn "Chơi game" ở trang chủ: kẹo cam hồng có độ dày, bấm lún xuống. */
+.play-btn {
+  color: #fff;
+  background: linear-gradient(180deg, #fcd34d 0%, #fb923c 45%, #ec4899 100%);
+  border: 2px solid #9a3412;
+  box-shadow:
+    0 7px 0 #c2410c,
+    0 9px 0 #7c2d12,
+    0 18px 28px -8px rgba(236, 72, 153, 0.7),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -5px 0 rgba(0, 0, 0, 0.12);
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out;
+}
+.play-btn:hover {
+  transform: translateY(-3px) scale(1.03);
+}
+.play-btn:active {
+  transform: translateY(7px);
+  box-shadow:
+    0 1px 0 #c2410c,
+    0 2px 0 #7c2d12,
+    0 4px 8px -2px rgba(236, 72, 153, 0.6),
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.12);
+}
+.play-btn:focus-visible {
+  outline: 4px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 4px;
+}
+
+/* Nút gỗ (Đăng nhập, Tạo tài khoản, ← Trang chủ, nút trên giao diện game): tấm ván có vân,
+   mép trên sáng, cạnh dưới dày, 2 đinh ở 2 đầu. */
+.wood-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.9rem;
+  padding: 0.6rem 1.15rem 0.6rem 1.25rem;
+  color: #fff4dc;
+  text-shadow: 0 2px 0 #4a2a10;
+  background:
+    linear-gradient(125deg, rgba(255, 236, 200, 0.28) 0 26%, transparent 26% 60%, rgba(70, 30, 5, 0.12) 60%),
+    repeating-linear-gradient(93deg, rgba(90, 45, 10, 0.14) 0 2px, transparent 2px 10px),
+    linear-gradient(180deg, #d49650, #a8682d);
+  border: 2px solid #4a2a10;
+  box-shadow:
+    0 5px 0 #5a2f0c,
+    0 10px 16px -6px rgba(40, 18, 4, 0.65),
+    inset 0 2px 0 rgba(255, 228, 180, 0.6),
+    inset 0 -3px 0 rgba(70, 35, 8, 0.35);
+  transition:
+    transform 0.1s ease-out,
+    box-shadow 0.1s ease-out,
+    filter 0.15s;
+}
+.wood-chip::before,
+.wood-chip::after {
+  /* Đinh sắt nhỏ ở 2 đầu tấm ván. */
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%, #f3f4f6, #6b7280 70%);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.wood-chip::before {
+  left: 6px;
+}
+.wood-chip::after {
+  right: 6px;
+}
+.wood-chip:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.07);
+}
+.wood-chip:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 1px 0 #5a2f0c,
+    0 3px 6px -2px rgba(40, 18, 4, 0.6),
+    inset 0 2px 0 rgba(255, 228, 180, 0.45),
+    inset 0 -2px 0 rgba(70, 35, 8, 0.3);
+}
+.wood-chip:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+/* Nhãn tính năng ở trang chủ: viên đá tối, icon trong vòng màu. */
+.feature-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem 0.3rem 0.3rem;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(30, 41, 79, 0.82), rgba(15, 23, 42, 0.82));
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 3px 0 rgba(2, 6, 23, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.feature-chip .feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  color: #fff;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* -----------------------------------------------------------------------------
+ * Giao diện trong game (components/hud/hud.tsx)
+ * -------------------------------------------------------------------------- */
+
+/* Tấm gỗ chứa ảnh đại diện + tên nhân vật. */
+.hud-plate {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 1.1rem;
+  padding: 0.35rem 1rem 0.35rem 0.35rem;
+  background:
+    linear-gradient(125deg, rgba(255, 236, 200, 0.25) 0 30%, transparent 30%),
+    repeating-linear-gradient(93deg, rgba(90, 45, 10, 0.14) 0 2px, transparent 2px 10px),
+    linear-gradient(180deg, #c98a4b, #9a5b26);
+  border: 2px solid #4a2a10;
+  box-shadow:
+    0 5px 0 #5a2f0c,
+    0 10px 18px -6px rgba(40, 18, 4, 0.6),
+    inset 0 2px 0 rgba(255, 228, 180, 0.55);
+}
+/* Ảnh đại diện: huy hiệu tròn mặt cắt đa giác, viền vàng. */
+.hud-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  color: #fff;
+  background: conic-gradient(
+    from 20deg,
+    #fbbf24 0 20%,
+    #f97316 0 40%,
+    #ec4899 0 60%,
+    #8b5cf6 0 80%,
+    #fb923c 0
+  );
+  border: 3px solid #fde68a;
+  box-shadow:
+    0 2px 0 #7a4316,
+    inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+  text-shadow: 0 2px 0 rgba(76, 29, 149, 0.7);
+}
+
+/* Nút vuông gỗ chỉ có icon (Thoát). */
+.hud-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.85rem;
+  color: #fff4dc;
+  text-shadow: 0 2px 0 #4a2a10;
+  background:
+    linear-gradient(125deg, rgba(255, 236, 200, 0.28) 0 30%, transparent 30%),
+    linear-gradient(180deg, #d49650, #a8682d);
+  border: 2px solid #4a2a10;
+  box-shadow:
+    0 5px 0 #5a2f0c,
+    0 10px 16px -6px rgba(40, 18, 4, 0.6),
+    inset 0 2px 0 rgba(255, 228, 180, 0.6);
+  transition:
+    transform 0.1s ease-out,
+    box-shadow 0.1s ease-out,
+    filter 0.15s;
+}
+.hud-icon-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.07);
+}
+.hud-icon-btn:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 1px 0 #5a2f0c,
+    0 3px 6px -2px rgba(40, 18, 4, 0.6),
+    inset 0 2px 0 rgba(255, 228, 180, 0.45);
+}
+.hud-icon-btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+/* Bảng trạng thái (kết nối, máy chủ): tấm đá tối với đèn LED. */
+.hud-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.8rem;
+  padding: 0.35rem 0.75rem;
+  color: #e2e8f0;
+  background: linear-gradient(180deg, rgba(51, 65, 85, 0.92), rgba(15, 23, 42, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 3px 0 rgba(2, 6, 23, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+/* Đèn LED: xanh = tốt, vàng = đang kết nối (nhấp nháy bằng opacity), đỏ = mất kết nối. */
+.led {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.led-on {
+  background: radial-gradient(circle at 35% 35%, #bbf7d0, #22c55e 60%);
+  box-shadow: 0 0 6px 1px rgba(34, 197, 94, 0.85);
+}
+.led-wait {
+  background: radial-gradient(circle at 35% 35%, #fef9c3, #eab308 60%);
+  box-shadow: 0 0 6px 1px rgba(234, 179, 8, 0.85);
+  animation: led-blink 1s ease-in-out infinite;
+}
+.led-off {
+  background: radial-gradient(circle at 35% 35%, #fecaca, #ef4444 60%);
+  box-shadow: 0 0 6px 1px rgba(239, 68, 68, 0.8);
+}
+@keyframes led-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Người dùng bật "giảm chuyển động": tắt hết, chỉ giữ hình tĩnh. */
+@media (prefers-reduced-motion: reduce) {
+  .home-parallax,
+  .home-kenburns,
+  .home-letter,
+  .home-title,
+  .home-fade-up,
+  .home-halo,
+  .home-shine,
+  .home-petal,
+  .home-sparkle,
+  .wood-swing,
+  .led-wait,
+  .sign-flip,
+  .tab-slide-next,
+  .tab-slide-prev {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
+  .home-petal,
+  .home-sparkle,
+  .home-shine {
+    display: none;
+  }
 }

@@ -6,7 +6,7 @@ const monorepoRoot = path.join(__dirname, "../..");
 
 const nextConfig: NextConfig = {
   // Các gói nội bộ xuất thẳng mã TypeScript, Next sẽ tự biên dịch chúng.
-  transpilePackages: ["@lw/game", "@lw/shared", "@lw/ui"],
+  transpilePackages: ["@lw/assets", "@lw/game", "@lw/shared", "@lw/ui"],
   outputFileTracingRoot: monorepoRoot,
   turbopack: {
     root: monorepoRoot,
