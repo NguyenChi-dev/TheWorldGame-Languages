@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  faArrowRightFromBracket,
   faArrowsRotate,
   faBan,
   faCrown,
   faDice,
   faMars,
   faPlay,
+  faRightFromBracket,
   faShirt,
   faSocks,
   faUser,
@@ -101,9 +101,13 @@ export function CharacterCreator({ initialUsername }: { initialUsername: string 
       <div aria-hidden="true" className="home-fade-up pointer-events-none fixed inset-0 bg-sky-950/25" />
 
       <form action={signOut} className="home-fade-up absolute left-4 top-4 z-20 sm:left-6 sm:top-6">
-        <button type="submit" className="wood-chip font-poly text-sm">
-          <FaIcon icon={faArrowRightFromBracket} flip="horizontal" />
-          Thoát
+        <button
+          type="submit"
+          className="wood-chip wood-chip-danger font-poly text-sm"
+          title="Đăng xuất khỏi tài khoản"
+        >
+          <FaIcon icon={faRightFromBracket} />
+          Đăng xuất
         </button>
       </form>
 

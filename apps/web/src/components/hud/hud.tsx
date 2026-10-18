@@ -136,7 +136,7 @@ export function Hud({ playerName, land }: { playerName: string; land: PlayerLand
             <span className="block text-[10px] font-bold uppercase tracking-widest text-amber-200/90">
               {land.languageCode.toUpperCase()}
             </span>
-            <span className="block max-w-[26vw] truncate font-poly text-sm leading-tight text-[#fff4dc] [text-shadow:0_2px_0_#4a2a10] sm:max-w-[12rem]">
+            <span className="hidden max-w-[12rem] truncate font-poly text-sm sm:block leading-tight text-[#fff4dc] [text-shadow:0_2px_0_#4a2a10]">
               {land.name}
             </span>
           </span>

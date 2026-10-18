@@ -1,4 +1,4 @@
-import { Room, type Client, type CloseCode } from "colyseus";
+import { Room, ServerError, type AuthContext, type Client, type CloseCode } from "colyseus";
 import {
   MAX_PLAYERS_PER_ROOM,
   MessageType,
@@ -6,8 +6,10 @@ import {
   isChatPhraseId,
   type ChatBroadcast,
   type ChatMessage,
+  type JoinOptions,
   type MoveMessage,
 } from "@lw/shared";
+import { AuthFailure, verifyPlayer, type PlayerIdentity } from "../auth.js";
 import { PlayerState, RegionState } from "./schema/region-state.js";
 
 /** Giữ số trong khoảng [min, max]. Trả về null nếu không phải số hợp lệ. */
@@ -17,8 +19,8 @@ function clampNumber(value: unknown, min: number, max: number): number | null {
 }
 
 /**
- * Phòng của một vùng đất. Chỉ đồng bộ vị trí và chat.
- * QUY TẮC: máy chủ realtime KHÔNG xử lý vàng hay phần thưởng (việc đó thuộc API của apps/web).
+ * Phòng của một vùng đất (app.config.ts lọc phòng theo landId). Chỉ đồng bộ vị trí và chat.
+ * QUY TẮC: máy chủ realtime KHÔNG xử lý vàng hay phần thưởng (việc đó thuộc apps/api).
  */
 export class RegionRoom extends Room<{ state: RegionState }> {
   maxClients = MAX_PLAYERS_PER_ROOM;
@@ -42,24 +44,39 @@ export class RegionRoom extends Room<{ state: RegionState }> {
     },
   };
 
-  // Chữ ký đầy đủ: onAuth(client, options, context). context.token chứa token trình duyệt gửi lên.
-  onAuth() {
-    // TODO: sau này sẽ kiểm tra token Supabase ở đây.
-    //   - Trình duyệt gửi access token (JWT) của Supabase khi vào phòng.
-    //   - Máy chủ xác minh token (supabase.auth.getClaims hoặc khóa JWKS) bằng SUPABASE_URL.
-    //   - Trả về thông tin người dùng (userId...) để dùng trong onJoin qua client.auth.
-    // Hiện tại cho mọi người vào.
-    return true;
+  /**
+   * Kiểm tra token Supabase, đọc tên / trang phục / vùng đất từ hồ sơ.
+   * Chỉ cho vào phòng của đúng vùng đất người chơi đang chọn.
+   */
+  async onAuth(
+    _client: Client,
+    options: Partial<JoinOptions>,
+    context: AuthContext,
+  ): Promise<PlayerIdentity> {
+    try {
+      const identity = await verifyPlayer(context.token);
+      if (!identity.landId || identity.landId !== options?.landId)
+        throw new AuthFailure("Bạn đang ở vùng đất khác");
+      return identity;
+    } catch (error) {
+      if (error instanceof AuthFailure) throw new ServerError(401, error.message);
+      throw error;
+    }
   }
 
-  onJoin(client: Client) {
+  onJoin(client: Client, options: Partial<JoinOptions>, identity: PlayerIdentity) {
     const player = new PlayerState();
     player.id = client.sessionId;
-    player.x = 0;
-    player.z = 0;
+    player.x = clampNumber(options?.x, -WORLD_HALF_EXTENT, WORLD_HALF_EXTENT) ?? 0;
+    player.z = clampNumber(options?.z, -WORLD_HALF_EXTENT, WORLD_HALF_EXTENT) ?? 0;
+    player.username = identity.username;
+    player.gender = identity.appearance.gender;
+    player.hat = identity.appearance.hat;
+    player.top = identity.appearance.top;
+    player.bottom = identity.appearance.bottom;
     this.state.players.set(client.sessionId, player);
     console.log(
-      `[region ${this.roomId}] ${client.sessionId} vào phòng (${this.clients.length}/${this.maxClients})`,
+      `[region ${this.roomId}] ${identity.username} vào phòng (${this.clients.length}/${this.maxClients})`,
     );
   }
 

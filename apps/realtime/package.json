@@ -13,6 +13,7 @@
   "dependencies": {
     "@colyseus/schema": "^5.0.39",
     "@colyseus/tools": "^0.18.9",
+    "@supabase/supabase-js": "^2.117.3",
     "colyseus": "^0.18.9"
   },
   "devDependencies": {

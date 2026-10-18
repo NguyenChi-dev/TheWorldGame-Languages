@@ -16,6 +16,7 @@ export function createLights(scene: Scene) {
 
   const sun = new DirectionalLight("sun", new Vector3(-0.5, -1, -0.4), scene);
   sun.intensity = 0.6;
+  return { ambient, sun };
 }
 
 /**
@@ -39,6 +40,33 @@ export function createCamera(scene: Scene) {
   camera.attachControl(true);
   fitCameraToScreen(camera);
   return camera;
+}
+
+/** Góc nhìn cố định trên bản đồ: từ phía nam hơi lệch đông, chếch xuống khoảng 53 độ. */
+const MAP_CAMERA_ALPHA = -Math.PI / 2 + 0.42;
+const MAP_CAMERA_BETA = 0.92;
+
+/**
+ * Bản đồ lớn: camera bám theo nhân vật với GÓC CỐ ĐỊNH (không xoay được, mọi nhà quay mặt về phía
+ * camera). Vẫn phóng to / thu nhỏ bằng con lăn chuột hoặc chụm 2 ngón; không kéo lệch đi chỗ khác.
+ */
+export function followCamera(camera: ArcRotateCamera, getTarget: () => { x: number; z: number }) {
+  camera.panningSensibility = 0;
+  camera.alpha = MAP_CAMERA_ALPHA;
+  camera.beta = MAP_CAMERA_BETA;
+  camera.lowerAlphaLimit = camera.upperAlphaLimit = MAP_CAMERA_ALPHA;
+  camera.lowerBetaLimit = camera.upperBetaLimit = MAP_CAMERA_BETA;
+  camera.radius = 30;
+  camera.lowerRadiusLimit = 16;
+  camera.upperRadiusLimit = 62;
+  const start = getTarget();
+  camera.target.set(start.x, 0.8, start.z);
+  camera.getScene().onBeforeRenderObservable.add(() => {
+    const { x, z } = getTarget();
+    const ease = Math.min(1, (camera.getEngine().getDeltaTime() / 1000) * 8);
+    camera.target.x += (x - camera.target.x) * ease;
+    camera.target.z += (z - camera.target.z) * ease;
+  });
 }
 
 /**

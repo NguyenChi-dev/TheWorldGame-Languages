@@ -83,7 +83,7 @@ export async function getActiveLands(): Promise<LandOption[]> {
       name: row.name as string,
       languageCode: row.language_code as string,
       description: (row.description as string) ?? "",
-      coverUrl: cover?.secure_url ? cloudinaryThumb(cover.secure_url, 480, 640) : null,
+      coverUrl: cover?.secure_url ? cloudinaryThumb(cover.secure_url, 640, 800) : null,
       areaCount: areas?.[0]?.count ?? 0,
     };
   });

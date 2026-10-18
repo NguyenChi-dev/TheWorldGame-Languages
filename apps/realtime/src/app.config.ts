@@ -5,7 +5,8 @@ import { RegionRoom } from "./rooms/region-room.js";
 const server = defineServer({
   rooms: {
     // Tên phòng lấy từ @lw/shared để web và máy chủ luôn khớp nhau.
-    [REGION_ROOM]: defineRoom(RegionRoom),
+    // Mỗi vùng đất một phòng riêng: người chơi chỉ gặp người cùng vùng đất (lọc theo landId).
+    [REGION_ROOM]: defineRoom(RegionRoom).filterBy(["landId"]),
   },
 });
 

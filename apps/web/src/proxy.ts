@@ -1,5 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { AUTH_COOKIE_OPTIONS, LEGACY_AUTH_COOKIE } from "@/lib/supabase/cookie";
+
+/** Xóa cookie đăng nhập tên mặc định cũ (trước đây game và admin dùng chung, xem lib/supabase/cookie.ts). */
+function dropLegacyAuthCookies(request: NextRequest, response: NextResponse) {
+  for (const cookie of request.cookies.getAll())
+    if (LEGACY_AUTH_COOKIE.test(cookie.name)) response.cookies.delete(cookie.name);
+  return response;
+}
 
 /**
  * Proxy chạy TRƯỚC mọi trang web (Next.js 16: middleware.ts đổi tên thành proxy.ts).
@@ -26,6 +34,7 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(url, key, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -48,10 +57,10 @@ export async function proxy(request: NextRequest) {
     loginUrl.search = "";
     const redirect = NextResponse.redirect(loginUrl);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
-    return redirect;
+    return dropLegacyAuthCookies(request, redirect);
   }
 
-  return response;
+  return dropLegacyAuthCookies(request, response);
 }
 
 export const config = {

@@ -5,3 +5,4 @@ export * from "./slug";
 export * from "./realtime";
 export * from "./characters";
 export * from "./media-url";
+export * from "./maps";

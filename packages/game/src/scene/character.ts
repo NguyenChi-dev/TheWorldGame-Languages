@@ -1,4 +1,12 @@
-import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, TransformNode } from "@babylonjs/core";
+import {
+  Color3,
+  Mesh,
+  MeshBuilder,
+  Scene,
+  StandardMaterial,
+  TransformNode,
+  VertexBuffer,
+} from "@babylonjs/core";
 import {
   BOTTOMS,
   HAIR_COLOR,
@@ -16,7 +24,27 @@ import {
  * người chơi tự phối: nam / nữ + mũ nón + áo + váy / quần (xem packages/shared/src/characters.ts).
  *
  * Gốc (root) đặt ở chân nhân vật, mặt nhìn về hướng -Z. Cao khoảng 1.8 đơn vị (1 ô đất = 2).
+ *
+ * Để vẽ được nhiều người chơi cùng lúc: dựng xong thì tô màu thẳng vào đỉnh (vertex color) và GỘP
+ * các khối thành 3 mesh (thân, tay trái, tay phải) dùng chung một vật liệu, cộng 1 mesh bóng dưới chân.
+ * Mỗi nhân vật chỉ còn 4 lệnh vẽ thay vì khoảng 50.
  */
+
+/** Vật liệu dùng màu theo đỉnh, dùng chung cho mọi nhân vật trong một scene. */
+const paintedMaterials = new WeakMap<Scene, StandardMaterial>();
+
+function paintedMaterial(scene: Scene) {
+  let mat = paintedMaterials.get(scene);
+  if (!mat) {
+    mat = new StandardMaterial("char-painted", scene);
+    mat.diffuseColor = Color3.White();
+    mat.specularColor = Color3.Black();
+    // Sáng nhẹ để màu tươi như tranh, không bị tối ở mặt khuất sáng.
+    mat.emissiveColor = new Color3(0.1, 0.1, 0.1);
+    paintedMaterials.set(scene, mat);
+  }
+  return mat;
+}
 
 /** Vật liệu theo màu, dùng chung trong một scene (nhiều nhân vật cùng màu không tạo vật liệu mới). */
 const materialCache = new WeakMap<Scene, Map<string, StandardMaterial>>();
@@ -66,7 +94,14 @@ export class CharacterModel {
   private readonly body: TransformNode;
   private readonly armLeft: TransformNode;
   private readonly armRight: TransformNode;
-  private readonly meshes: Mesh[] = [];
+  /** Hai chân (chỉ có khi mặc quần; váy dài thì đung đưa cả thân). */
+  private legs: TransformNode[] = [];
+  /** Nhịp bước (radian) và mức "đang đi" 0..1 (chuyển mượt giữa đứng / đi). */
+  private phase = 0;
+  private walkBlend = 0;
+  private meshes: Mesh[] = [];
+  /** Màu của từng khối, dùng khi tô màu đỉnh lúc gộp. */
+  private readonly colors = new Map<Mesh, string>();
   private time = Math.random() * 10;
 
   constructor(
@@ -88,6 +123,48 @@ export class CharacterModel {
       TransformNode,
     ];
     this.head(shoulderY + 0.4);
+    this.bake();
+  }
+
+  /** Tô màu đỉnh rồi gộp khối theo phần cơ thể (thân / tay trái / tay phải). */
+  private bake() {
+    const groups = new Map<TransformNode, Mesh[]>();
+    const kept: Mesh[] = [];
+    for (const mesh of this.meshes) {
+      const color = this.colors.get(mesh);
+      const parent = mesh.parent as TransformNode | null;
+      // Bóng dưới chân (trong suốt) giữ riêng.
+      if (!color || !parent) {
+        kept.push(mesh);
+        continue;
+      }
+      const c = Color3.FromHexString(color);
+      const count = mesh.getTotalVertices();
+      const data = new Float32Array(count * 4);
+      for (let i = 0; i < count; i++) data.set([c.r, c.g, c.b, 1], i * 4);
+      mesh.setVerticesData(VertexBuffer.ColorKind, data);
+      const list = groups.get(parent) ?? [];
+      list.push(mesh);
+      groups.set(parent, list);
+    }
+    const material = paintedMaterial(this.scene);
+    for (const [parent, list] of groups) {
+      // Gộp trong hệ tọa độ của node cha: tạm đưa node cha về vị trí / góc gốc.
+      const position = parent.position.clone();
+      const rotation = parent.rotation.clone();
+      parent.position.setAll(0);
+      parent.rotation.setAll(0);
+      list.forEach((mesh) => mesh.computeWorldMatrix(true));
+      const merged = Mesh.MergeMeshes(list, true, true);
+      parent.position.copyFrom(position);
+      parent.rotation.copyFrom(rotation);
+      if (!merged) continue;
+      merged.name = "char-part";
+      merged.parent = parent;
+      merged.material = material;
+      kept.push(merged);
+    }
+    this.meshes = kept;
   }
 
   /** Mọi mesh của nhân vật. */
@@ -97,32 +174,45 @@ export class CharacterModel {
 
   /**
    * Gọi mỗi khung hình.
-   * - walking: nhún và vung tay.
-   * - waving: giơ tay vẫy chào (màn chọn nhân vật).
-   * - còn lại: thở nhẹ.
+   * - speed: tốc độ đi so với tốc độ chuẩn (0 = đứng yên, 1 = đi bình thường). Nhịp bước, độ vung tay /
+   *   chân, độ nhún và nghiêng người tăng theo tốc độ; chuyển mượt giữa đứng và đi.
+   * - waving: giơ tay vẫy chào khi đứng yên (màn chọn nhân vật).
    */
-  update(deltaSeconds: number, state: { walking?: boolean; waving?: boolean } = {}) {
+  update(deltaSeconds: number, state: { speed?: number; waving?: boolean } = {}) {
     this.time += deltaSeconds;
     const t = this.time;
+    const speed = Math.min(1.4, Math.max(0, state.speed ?? 0));
     const ease = Math.min(1, deltaSeconds * 10);
     const towards = (node: TransformNode, axis: "x" | "z", value: number) => {
       node.rotation[axis] += (value - node.rotation[axis]) * ease;
     };
+    // Chuyển dần sang dáng đi / dáng đứng (không giật).
+    this.walkBlend += ((speed > 0.05 ? 1 : 0) - this.walkBlend) * Math.min(1, deltaSeconds * 8);
+    const walk = this.walkBlend;
+    // Nhịp bước theo tốc độ: đi nhanh thì bước dồn dập hơn.
+    this.phase += deltaSeconds * (5 + 6 * speed) * (speed > 0.05 ? 1 : 0.4);
+    const swing = Math.sin(this.phase);
+    const amount = walk * Math.min(1, 0.45 + speed * 0.6);
 
-    if (state.walking) {
-      this.body.position.y = Math.abs(Math.sin(t * 9)) * 0.08;
-      towards(this.armLeft, "x", Math.sin(t * 9) * 0.6);
-      towards(this.armRight, "x", -Math.sin(t * 9) * 0.6);
+    // Thân: nhún 2 lần mỗi chu kỳ bước, đung đưa nhẹ, hơi ngả về trước khi đi; đứng yên thì thở nhẹ.
+    const idle = Math.sin(t * 2) * 0.012;
+    this.body.position.y = idle * (1 - walk) + Math.abs(Math.cos(this.phase)) * 0.055 * amount;
+    this.body.rotation.z = swing * 0.045 * amount;
+    this.body.rotation.x = -0.08 * amount;
+
+    for (const [i, leg] of this.legs.entries()) towards(leg, "x", (i ? -swing : swing) * 0.6 * amount);
+
+    if (walk > 0.05) {
+      towards(this.armLeft, "x", -swing * 0.75 * amount);
+      towards(this.armRight, "x", swing * 0.75 * amount);
       towards(this.armLeft, "z", -0.15);
       towards(this.armRight, "z", 0.15);
     } else if (state.waving) {
-      this.body.position.y = Math.abs(Math.sin(t * 3)) * 0.05;
       towards(this.armLeft, "x", 0);
       towards(this.armLeft, "z", -0.15);
       towards(this.armRight, "x", 0);
       towards(this.armRight, "z", 2.5 + Math.sin(t * 8) * 0.35);
     } else {
-      this.body.position.y = Math.sin(t * 2) * 0.012;
       for (const arm of [this.armLeft, this.armRight]) towards(arm, "x", 0);
       towards(this.armLeft, "z", -0.15 + Math.sin(t * 2) * 0.03);
       towards(this.armRight, "z", 0.15 - Math.sin(t * 2) * 0.03);
@@ -143,7 +233,9 @@ export class CharacterModel {
     if (position) mesh.position.set(...position);
     if (rotation) mesh.rotation.set(...rotation);
     if (scaling) mesh.scaling.set(...scaling);
-    mesh.material = material(this.scene, color, alpha);
+    // Khối trong suốt (bóng) có vật liệu riêng; khối khác tô màu đỉnh lúc gộp (bake).
+    if (alpha !== undefined) mesh.material = material(this.scene, color, alpha);
+    else this.colors.set(mesh, color);
     this.meshes.push(mesh);
     return mesh;
   }
@@ -207,19 +299,26 @@ export class CharacterModel {
       );
       return 0.72;
     }
+    // Mỗi chân xoay quanh khớp hông (y = 0.55). Gắn vào gốc, không nhún theo thân, nên bàn chân
+    // luôn chạm đất; phần hông của quần (thuộc thân) che chỗ nối.
+    const hip = 0.55;
     for (const side of [-1, 1]) {
+      const leg = new TransformNode("leg", this.scene);
+      leg.parent = this.root;
+      leg.position.set(side * 0.11, hip, 0);
+      this.legs.push(leg);
       this.cylinder(
-        { height: 0.46, top: 0.18, bottom: 0.15, sides: 6 },
-        { color: bottom.color, parent, position: [side * 0.11, 0.32, 0] },
+        { height: 0.5, top: 0.18, bottom: 0.15, sides: 6 },
+        { color: bottom.color, parent: leg, position: [0, 0.3 - hip, 0] },
       );
       // Sọc dọc bên ngoài ống quần.
       this.box([0.025, 0.42, 0.06], {
         color: bottom.accent,
-        parent,
-        position: [side * 0.192, 0.33, 0],
+        parent: leg,
+        position: [side * 0.082, 0.33 - hip, 0],
         rotation: [0, 0, side * -0.03],
       });
-      this.box([0.17, 0.1, 0.26], { color: "#2a2522", parent, position: [side * 0.11, 0.05, -0.03] });
+      this.box([0.17, 0.1, 0.26], { color: "#2a2522", parent: leg, position: [0, 0.05 - hip, -0.03] });
     }
     this.cylinder(
       { height: 0.14, top: 0.44, bottom: 0.4 },

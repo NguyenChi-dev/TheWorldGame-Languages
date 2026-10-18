@@ -8,3 +8,4 @@ export {
   type CharacterPreviewHandle,
   type CharacterPreviewOptions,
 } from "./character-preview";
+export type { GraphicsQuality } from "./scene/atmosphere";

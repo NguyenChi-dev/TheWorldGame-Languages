@@ -1,10 +1,18 @@
 import { schema, t, type SchemaType } from "@colyseus/schema";
 
-/** Một người chơi trong phòng. Chỉ có vị trí, không có vàng hay vật phẩm. */
+/**
+ * Một người chơi trong phòng: vị trí đích, tên nhân vật và trang phục (đọc từ hồ sơ khi vào phòng).
+ * Không có vàng hay vật phẩm.
+ */
 export const PlayerState = schema({
   id: t.string(),
   x: t.number(),
   z: t.number(),
+  username: t.string(),
+  gender: t.string(),
+  hat: t.string(),
+  top: t.string(),
+  bottom: t.string(),
 });
 export type PlayerState = SchemaType<typeof PlayerState>;
 
