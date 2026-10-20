@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ADMIN_SECTIONS } from "@lw/shared";
+import { ADMIN_SECTIONS, can } from "@lw/shared";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { PageTitle } from "@/components/page-title";
 import { requireSection } from "@/lib/auth";
@@ -33,7 +33,7 @@ export default async function LandsPage() {
         Vùng đất
       </PageTitle>
       {/* Xóa vùng đất: chỉ admin (database cũng chỉ cho admin). */}
-      <LandsManager rows={rows} canDelete={session.role === "admin"} />
+      <LandsManager rows={rows} canDelete={can(session.role, "content.delete")} />
     </>
   );
 }

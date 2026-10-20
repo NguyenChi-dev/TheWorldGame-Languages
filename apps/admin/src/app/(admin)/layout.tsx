@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
   return (
     <div className="min-h-dvh bg-background md:flex">
       <BackCacheGuard />
-      <SessionWatch userId={session.userId} />
+      <SessionWatch userId={session.userId} role={session.role} />
       <Sidebar
         items={sectionsForRole(session.role).map((section) => ({
           key: section.key,

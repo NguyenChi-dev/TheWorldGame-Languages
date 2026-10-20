@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AREA_SCENE_LABELS } from "@lw/shared";
+import { AREA_SCENE_LABELS, can } from "@lw/shared";
 import { ActiveBadge } from "@/components/badge";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { Card } from "@/components/card";
@@ -69,7 +69,7 @@ export default async function AreaPage({ params }: { params: Params }) {
           <p className="mt-3 text-xs text-slate-500">
             Bật/tắt và đổi thứ tự ở danh sách khu vực của vùng đất {land.name}.
           </p>
-          {session.role === "admin" ? (
+          {can(session.role, "content.delete") ? (
             <div className="mt-4 border-t border-secondary pt-3">
               <DeleteAreaButton area={area} />
             </div>

@@ -11,7 +11,7 @@ import {
   type IconDefinition,
 } from "@fortawesome/free-solid-svg-icons";
 import Link from "next/link";
-import { ADMIN_SECTIONS, ROLE_LABELS } from "@lw/shared";
+import { ADMIN_SECTIONS, ROLE_LABELS, can } from "@lw/shared";
 import {
   PLAYER_STATUSES,
   PLAYER_STATUS_LABELS,
@@ -118,7 +118,7 @@ export default async function PlayersPage({ searchParams }: { searchParams: Sear
     return text ? `/players?${text}` : "/players";
   };
 
-  const canManage = session.role === "admin";
+  const canManage = can(session.role, "players.manage");
   const isStaffTab = group === "staff";
   // Đổi tab: bỏ tìm kiếm / lọc trạng thái / trang của tab cũ.
   const groupHref = (key: AccountGroup) => (key === "staff" ? "/players?group=staff" : "/players");

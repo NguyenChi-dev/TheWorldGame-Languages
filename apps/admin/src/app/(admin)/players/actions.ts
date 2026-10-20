@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isRole } from "@lw/shared";
+import { isRole, rolesFor } from "@lw/shared";
 import type { AdminPlayerActionResponse } from "@lw/shared/api";
 import type { ActionResult, ActionState } from "@/lib/action-state";
 import { ApiCallError, apiRequest } from "@/lib/api";
@@ -15,7 +15,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function changeUserRole(_prev: ActionState, formData: FormData): Promise<ActionState> {
   let session;
   try {
-    session = await requireRole(["admin"]);
+    session = await requireRole(rolesFor("staff.manage"));
   } catch (error) {
     if (error instanceof AuthError) return { error: error.message };
     throw error;
@@ -70,7 +70,7 @@ export async function changeUserRole(_prev: ActionState, formData: FormData): Pr
 /** Lớp 2: chỉ admin. Trả thông báo lỗi thay vì ném lỗi ra giao diện. */
 async function adminGuard(id: string): Promise<string | null> {
   try {
-    await requireRole(["admin"]);
+    await requireRole(rolesFor("players.manage"));
   } catch (error) {
     if (error instanceof AuthError) return error.message;
     throw error;

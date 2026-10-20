@@ -15,6 +15,7 @@
  */
 import { revalidatePath } from "next/cache";
 import type { PostgrestError } from "@supabase/supabase-js";
+import { rolesFor, type StaffRole } from "@lw/shared";
 import { AreaInput, IdList, LandInput, SkillInput } from "@lw/shared/schemas";
 import type { ActionResult } from "@/lib/action-state";
 import { logAction, type LogActionInput } from "@/lib/audit";
@@ -22,16 +23,16 @@ import { AuthError, requireRole } from "@/lib/auth";
 import { UUID } from "@/lib/content";
 import { createClient } from "@/lib/supabase/server";
 
-const CONTENT_EDITORS = ["admin", "editor"] as const;
+const CONTENT_EDITORS = rolesFor("content.update");
 /** Xóa vùng đất / khu vực / kỹ năng không hoàn tác được: chỉ admin. Editor tắt is_active để ẩn. */
-const DELETERS = ["admin"] as const;
+const DELETERS = rolesFor("content.delete");
 
 type Row = Record<string, unknown>;
 
 const fail = (error: string): ActionResult<never> => ({ ok: false, error });
 
 /** Lớp 2: mặc định chỉ admin, editor. Trả về thông báo lỗi (nếu bị chặn) thay vì ném lỗi ra giao diện. */
-async function guard(roles: readonly ("admin" | "editor")[] = CONTENT_EDITORS): Promise<string | null> {
+async function guard(roles: readonly StaffRole[] = CONTENT_EDITORS): Promise<string | null> {
   try {
     await requireRole(roles);
     return null;
@@ -178,7 +179,7 @@ export async function updateLand(id: string, input: unknown): Promise<ActionResu
 }
 
 export async function setLandActive(id: string, isActive: boolean): Promise<ActionResult> {
-  const denied = await guard();
+  const denied = await guard(rolesFor("content.publish"));
   if (denied) return fail(denied);
   if (!UUID.test(id) || typeof isActive !== "boolean") return fail("Dữ liệu gửi lên không hợp lệ");
 
@@ -311,7 +312,7 @@ export async function updateArea(id: string, input: unknown): Promise<ActionResu
 }
 
 export async function setAreaActive(id: string, isActive: boolean): Promise<ActionResult> {
-  const denied = await guard();
+  const denied = await guard(rolesFor("content.publish"));
   if (denied) return fail(denied);
   if (!UUID.test(id) || typeof isActive !== "boolean") return fail("Dữ liệu gửi lên không hợp lệ");
 

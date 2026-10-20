@@ -7,6 +7,7 @@
  * Luồng tải ảnh: getUploadSignature → trình duyệt gửi file thẳng tới Cloudinary → registerUpload
  * (xác minh chữ ký phản hồi của Cloudinary rồi lưu vào bảng media).
  */
+import { rolesFor } from "@lw/shared";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-state";
 import { logAction } from "@/lib/audit";
@@ -23,7 +24,7 @@ import {
 } from "@/lib/cloudinary";
 import { createClient } from "@/lib/supabase/server";
 
-const MEDIA_EDITORS = ["admin", "editor"] as const;
+const MEDIA_EDITORS = rolesFor("media.create");
 
 async function guard(): Promise<string | null> {
   try {

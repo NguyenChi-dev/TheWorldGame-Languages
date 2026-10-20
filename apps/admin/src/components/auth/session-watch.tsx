@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type { StaffRole } from "@lw/shared";
 import { checkSession } from "@/app/(admin)/session-actions";
 
 /** Kênh báo giữa các tab cùng trang quản trị (cùng trình duyệt). */
@@ -26,10 +27,11 @@ const here = () => encodeURIComponent(`${window.location.pathname}${window.locat
  * - Quay lại tab / cửa sổ, có mạng trở lại, tab khác đăng xuất, hoặc mỗi 5 phút: hỏi máy chủ.
  * - Hết phiên → trang đăng nhập (giữ ?next). Thiếu 2 lớp → trang nhập mã. Mất quyền → báo không có quyền.
  * - Tab khác đăng nhập tài khoản khác → tải lại để không hiện dữ liệu của tài khoản cũ.
+ * - Admin vừa đổi vai trò của mình (ví dụ editor → moderator) → tải lại để menu / nút theo quyền mới.
  * - Mất mạng / máy chủ xác thực lỗi: KHÔNG đăng xuất, thử lại lần sau.
  * Chỉ một lần hỏi tại một thời điểm (không dồn request, không lặp vô hạn).
  */
-export function SessionWatch({ userId }: { userId: string }) {
+export function SessionWatch({ userId, role }: { userId: string; role: StaffRole }) {
   useEffect(() => {
     let checking = false;
     let stopped = false;
@@ -43,7 +45,7 @@ export function SessionWatch({ userId }: { userId: string }) {
         const status = await checkSession();
         if (stopped) return;
         if (status.state === "ok") {
-          if (status.userId !== userId) window.location.reload();
+          if (status.userId !== userId || status.role !== role) window.location.reload();
         } else if (status.state === "signed_out") {
           window.location.replace(`/login?expired=1&next=${here()}`);
         } else if (status.state === "mfa_required") {
@@ -78,7 +80,7 @@ export function SessionWatch({ userId }: { userId: string }) {
       window.removeEventListener("online", onVisible);
       window.clearInterval(timer);
     };
-  }, [userId]);
+  }, [userId, role]);
   return null;
 }
 

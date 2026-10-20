@@ -16,7 +16,7 @@ beforeEach(() => vi.clearAllMocks());
 describe("checkSession (trình duyệt hỏi định kỳ / khi đổi tab)", () => {
   it("nhân viên hợp lệ: ok kèm id, không trả token", async () => {
     as({ id: "u-1", role: "editor" });
-    expect(await checkSession()).toEqual({ state: "ok", userId: "u-1" });
+    expect(await checkSession()).toEqual({ state: "ok", userId: "u-1", role: "editor" });
   });
   it.each<[FakeUser | null, string]>([
     [null, "signed_out"],

@@ -1,3 +1,4 @@
+import { can } from "@lw/shared";
 import type { Metadata } from "next";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { requireSection } from "@/lib/auth";
@@ -44,10 +45,15 @@ export default async function LandPage({ params }: { params: Params }) {
             land={land}
             coverUrl={coverRow ? coverUrlOf(coverRow) : null}
             areaCount={rows.length}
-            canDelete={session.role === "admin"}
+            canDelete={can(session.role, "content.delete")}
           />
         </aside>
-        <AreasManager landId={land.id} rows={rows} skills={skills} canDelete={session.role === "admin"} />
+        <AreasManager
+          landId={land.id}
+          rows={rows}
+          skills={skills}
+          canDelete={can(session.role, "content.delete")}
+        />
       </div>
     </>
   );

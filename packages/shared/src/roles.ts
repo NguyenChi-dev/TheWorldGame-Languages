@@ -6,6 +6,8 @@
  * mà quên sửa RLS thì người dùng thấy menu nhưng vẫn bị database từ chối.
  */
 
+import { PERMISSIONS } from "./permissions";
+
 /** Khớp với enum public.user_role trong database. */
 export const ROLES = ["player", "admin", "editor", "moderator"] as const;
 export type Role = (typeof ROLES)[number];
@@ -54,6 +56,7 @@ export interface AdminSection {
 
 /**
  * Bảng phân quyền: mỗi mục menu / trang của apps/admin và các vai trò được vào.
+ * Vai trò của mỗi mục lấy từ ma trận thao tác PERMISSIONS (permissions.ts), không ghi tay lần hai.
  * Thứ tự ở đây là thứ tự trên thanh bên. Route con dùng chung quyền của mục cha,
  * ví dụ /lands/[landId]/areas/... (khu vực, bài học) dùng quyền của "lands".
  */
@@ -63,37 +66,55 @@ export const ADMIN_SECTIONS = {
     href: "/",
     label: "Tổng quan",
     group: null,
-    roles: ["admin", "editor", "moderator"],
+    roles: PERMISSIONS["admin.access"],
   },
   lands: {
     key: "lands",
     href: "/lands",
     label: "Vùng đất",
     group: "content",
-    roles: ["admin", "editor"],
+    roles: PERMISSIONS["content.update"],
     children: [
       { href: "/lands", label: "Danh sách vùng đất" },
       { href: "/lands/skills", label: "Kỹ năng luyện tập" },
       { href: "/map-editor", label: "Thiết kế bản đồ 3D" },
     ],
   },
-  words: { key: "words", href: "/words", label: "Kho từ vựng", group: "content", roles: ["admin", "editor"] },
-  media: { key: "media", href: "/media", label: "Media", group: "content", roles: ["admin", "editor"] },
+  words: {
+    key: "words",
+    href: "/words",
+    label: "Kho từ vựng",
+    group: "content",
+    roles: PERMISSIONS["content.update"],
+  },
+  media: {
+    key: "media",
+    href: "/media",
+    label: "Media",
+    group: "content",
+    roles: PERMISSIONS["media.create"],
+  },
   economy: {
     key: "economy",
     href: "/economy",
     label: "Vật phẩm và kinh tế",
     group: "economy",
-    roles: ["admin"],
+    roles: PERMISSIONS["economy.manage"],
   },
   players: {
     key: "players",
     href: "/players",
     label: "Người chơi và báo cáo",
     group: "operations",
-    roles: ["admin", "moderator"],
+    roles: PERMISSIONS["players.read"],
   },
-  logs: { key: "logs", href: "/logs", label: "Nhật ký", group: "operations", roles: ["admin"] },
+  logs: {
+    key: "logs",
+    href: "/logs",
+    label: "Nhật ký",
+    group: "operations",
+    roles: PERMISSIONS["logs.read"],
+  },
 } as const satisfies Record<string, AdminSection>;
 
 export type AdminSectionKey = keyof typeof ADMIN_SECTIONS;

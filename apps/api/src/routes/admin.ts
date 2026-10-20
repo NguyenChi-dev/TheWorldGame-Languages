@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { STAFF_ROLES } from "@lw/shared";
+import { rolesFor } from "@lw/shared";
 import type { AdminMeResponse } from "@lw/shared/api";
 import { auth } from "../middleware/auth.js";
 import { requireRole, type StaffEnv } from "../middleware/require-role.js";
@@ -14,7 +14,7 @@ import { adminPlayerRoutes } from "./admin-players.js";
  */
 export const adminRoutes = new Hono<StaffEnv>()
   .route("/players", adminPlayerRoutes)
-  .use(auth, requireRole(STAFF_ROLES))
+  .use(auth, requireRole(rolesFor("admin.access")))
 
   /** Thông tin nhân viên đang đăng nhập, để app quản trị biết hiện menu nào. */
   .get("/me", (c) => {

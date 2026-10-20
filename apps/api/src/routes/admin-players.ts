@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { rolesFor } from "@lw/shared";
 import {
   AdminBanRequest,
   AdminPlayerParams,
@@ -26,7 +27,7 @@ import { FOREVER_BAN, getPlayer, listPlayers, updateAuthUser } from "../services
  *   - Khóa / xóa chỉ áp dụng cho tài khoản 'player'. Tài khoản nhân viên phải hạ vai trò trước
  *     (đổi vai trò làm ở trang admin, có ghi nhật ký riêng).
  */
-const ADMIN_ONLY = requireRole(["admin"]);
+const ADMIN_ONLY = requireRole(rolesFor("players.manage"));
 
 function supabaseOrFail() {
   const supabase = getSupabaseAdmin();
@@ -70,7 +71,7 @@ async function done(
 const who = (player: AdminPlayer) => player.username ?? player.email ?? player.id;
 
 export const adminPlayerRoutes = new Hono<StaffEnv>()
-  .use(auth, requireRole(["admin", "moderator"]))
+  .use(auth, requireRole(rolesFor("players.read")))
 
   .get("/", validate("query", AdminPlayersQuery), async (c) => {
     const query = c.req.valid("query");

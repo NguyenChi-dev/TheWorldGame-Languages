@@ -1,3 +1,4 @@
+import { can } from "@lw/shared";
 import type { Metadata } from "next";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { PageTitle } from "@/components/page-title";
@@ -28,7 +29,7 @@ export default async function SkillsPage() {
         Kỹ năng luyện tập
       </PageTitle>
       {/* Xóa kỹ năng: chỉ admin (database cũng chỉ cho admin). */}
-      <SkillsManager rows={rows} canDelete={session.role === "admin"} />
+      <SkillsManager rows={rows} canDelete={can(session.role, "content.delete")} />
     </>
   );
 }

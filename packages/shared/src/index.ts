@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./roles";
+export * from "./permissions";
 export * from "./world";
 export * from "./slug";
 export * from "./realtime";
