@@ -12,18 +12,24 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   hint?: React.ReactNode;
   /** Biểu tượng bên trái ô nhập, đổi sang màu accent khi ô đang được chọn. */
   icon?: IconType;
+  /** Lỗi của riêng ô này: viền đỏ + dòng báo lỗi ngay dưới ô (trình đọc màn hình đọc kèm ô nhập). */
+  error?: string;
 }
+
+const errorInputClass = "border-red-300! focus:border-red-400! focus:ring-red-200!";
 
 function FieldShell({
   id,
   label,
   hint,
+  error,
   icon: Icon,
   children,
 }: {
   id: string;
   label: string;
   hint?: React.ReactNode;
+  error?: string;
   icon?: IconType;
   children: React.ReactNode;
 }) {
@@ -38,30 +44,46 @@ function FieldShell({
         ) : null}
         {children}
       </div>
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-red-600">
+          <AlertIcon className="size-3.5 shrink-0" />
+          {error}
+        </p>
+      ) : null}
       {hint ? <div className="mt-1.5 text-xs text-slate-500">{hint}</div> : null}
     </div>
   );
 }
 
-export function TextField({ label, hint, icon, className = "", ...props }: FieldProps) {
+/** Thuộc tính a11y cho ô có lỗi. */
+const errorProps = (id: string, error?: string) =>
+  error ? { "aria-invalid": true, "aria-describedby": `${id}-error` } : {};
+
+export function TextField({ label, hint, icon, error, className = "", ...props }: FieldProps) {
   const id = useId();
   return (
-    <FieldShell id={id} label={label} hint={hint} icon={icon}>
-      <input id={id} className={`${inputClass} ${icon ? "pl-12" : ""} ${className}`} {...props} />
+    <FieldShell id={id} label={label} hint={hint} icon={icon} error={error}>
+      <input
+        id={id}
+        className={`${inputClass} ${icon ? "pl-12" : ""} ${error ? errorInputClass : ""} ${className}`}
+        {...errorProps(id, error)}
+        {...props}
+      />
     </FieldShell>
   );
 }
 
 /** Ô mật khẩu có nút hiện/ẩn. */
-export function PasswordField({ label, hint, icon, ...props }: FieldProps) {
+export function PasswordField({ label, hint, icon, error, ...props }: FieldProps) {
   const id = useId();
   const [visible, setVisible] = useState(false);
   return (
-    <FieldShell id={id} label={label} hint={hint} icon={icon}>
+    <FieldShell id={id} label={label} hint={hint} icon={icon} error={error}>
       <input
         id={id}
         type={visible ? "text" : "password"}
-        className={`${inputClass} pr-12 ${icon ? "pl-12" : ""}`}
+        className={`${inputClass} pr-12 ${icon ? "pl-12" : ""} ${error ? errorInputClass : ""}`}
+        {...errorProps(id, error)}
         {...props}
       />
       <button

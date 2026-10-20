@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useId, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { Alert, ShineButtonContent, SubmitButton } from "@/components/auth/form";
 import { ArrowRightIcon, CheckIcon, CopyIcon, PhoneIcon, ShieldIcon } from "@/components/icons";
 import { inputClass, primaryButtonClass } from "@/components/auth/styles";
@@ -10,10 +11,13 @@ import { startTotpEnroll, verifyTotp, type EnrollResult } from "../../actions";
 function CodeForm({ factorId }: { factorId?: string }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(verifyTotp, {});
   const id = useId();
+  // Trang muốn vào sau khi xác thực xong (máy chủ kiểm tra lại, chống open redirect).
+  const next = useSearchParams().get("next");
 
   return (
     <form action={formAction} className="stagger space-y-4 short:space-y-3">
       {factorId ? <input type="hidden" name="factorId" value={factorId} /> : null}
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       <div>
         <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
           Mã 6 số trong ứng dụng xác thực

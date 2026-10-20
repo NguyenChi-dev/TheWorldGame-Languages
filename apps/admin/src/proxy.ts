@@ -61,6 +61,12 @@ export async function proxy(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
+    // Ghi nhớ trang đang muốn vào để quay lại sau khi đăng nhập (trang login kiểm tra lại bằng safeNextPath).
+    const { pathname, search } = request.nextUrl;
+    if (pathname !== "/") loginUrl.searchParams.set("next", `${pathname}${search}`);
+    // Còn cookie phiên mà không đọc được phiên: phiên đã hết hạn / bị thu hồi.
+    if (request.cookies.getAll().some((cookie) => cookie.name.startsWith(AUTH_COOKIE_OPTIONS.name)))
+      loginUrl.searchParams.set("expired", "1");
     const redirect = NextResponse.redirect(loginUrl);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     return dropLegacyAuthCookies(request, redirect);

@@ -5,11 +5,22 @@
  * Đăng nhập: mật khẩu (aal1) rồi mã TOTP (aal2), trừ khi công tắc admin_settings.require_mfa đang tắt.
  * Tài khoản 'player' bị chặn ngay sau bước mật khẩu.
  */
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { USERNAME_PATTERN, USERNAME_RULE, isRole, isStaffRole } from "@lw/shared";
+import { isRole, isStaffRole } from "@lw/shared";
 import type { ActionState } from "@/lib/action-state";
 import { getSession, readMfaRequired } from "@/lib/auth";
+import {
+  SIGN_IN_FIELDS,
+  SIGN_UP_FIELDS,
+  SignInInput,
+  SignUpInput,
+  fieldErrors,
+  parseForm,
+  signInErrorMessage,
+} from "@/lib/auth-schemas";
+import { safeNextPath, withNext } from "@/lib/safe-next";
+import { AUTH_COOKIE_OPTIONS } from "@/lib/supabase/cookie";
 import { createClient } from "@/lib/supabase/server";
 
 const PLAYER_BLOCKED = "Tài khoản người chơi không được vào trang quản trị";
@@ -17,13 +28,16 @@ const NOT_GRANTED =
   "Tài khoản chưa được cấp quyền quản trị. Hãy nhờ admin cấp vai trò ở trang Người chơi rồi đăng nhập lại.";
 
 export async function signIn(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseForm(SignInInput, formData, SIGN_IN_FIELDS);
   const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-  if (!email || !password) return { values: { email }, error: "Nhập email và mật khẩu" };
+  if (!parsed.success) return { values: { email }, fieldErrors: fieldErrors(parsed.error) };
+  const next = safeNextPath(formData.get("next"));
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { values: { email }, error: "Email hoặc mật khẩu không đúng" };
+  const { data, error } = await supabase.auth
+    .signInWithPassword(parsed.data)
+    .catch(() => ({ data: null, error: { name: "AuthRetryableFetchError", status: 0 } }));
+  if (error || !data?.user) return { values: { email }, error: signInErrorMessage(error ?? {}) };
 
   // Dùng chính client vừa đăng nhập (đã giữ phiên mới) để đọc vai trò qua RLS.
   const { data: profile, error: profileError } = await supabase
@@ -45,32 +59,26 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
   }
 
   // Công tắc 2 lớp đang tắt (admin_settings.require_mfa = false) thì vào thẳng trang quản trị.
-  redirect((await readMfaRequired(supabase)) ? "/login/mfa" : "/");
+  // Giữ trang đích (đã kiểm tra là đường dẫn nội bộ) qua bước xác thực hai lớp.
+  redirect((await readMfaRequired(supabase)) ? withNext("/login/mfa", next) : next);
 }
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD = 8;
 
 /**
  * Đăng ký tài khoản quản trị. Tài khoản mới LUÔN là 'player' (trigger handle_new_user trong database),
  * nên chưa vào được trang quản trị cho tới khi một admin cấp vai trò ở trang Người chơi.
  */
 export async function signUp(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const email = String(formData.get("email") ?? "")
-    .trim()
-    .toLowerCase();
-  // NFC: chữ có dấu luôn ở dạng dựng sẵn (1 ký tự), khớp kiểm tra của database.
-  const username = String(formData.get("username") ?? "")
-    .trim()
-    .normalize("NFC");
-  const password = String(formData.get("password") ?? "");
-  const confirm = String(formData.get("confirmPassword") ?? "");
-
-  if (!EMAIL.test(email)) return { values: { email, username }, error: "Email không hợp lệ" };
-  if (!USERNAME_PATTERN.test(username)) return { values: { email, username }, error: USERNAME_RULE };
-  if (password.length < MIN_PASSWORD)
-    return { values: { email, username }, error: `Mật khẩu tối thiểu ${MIN_PASSWORD} ký tự` };
-  if (password !== confirm) return { values: { email, username }, error: "Mật khẩu nhập lại không khớp" };
+  const parsed = parseForm(SignUpInput, formData, SIGN_UP_FIELDS);
+  if (!parsed.success) {
+    return {
+      values: {
+        email: String(formData.get("email") ?? "").trim(),
+        username: String(formData.get("username") ?? "").trim(),
+      },
+      fieldErrors: fieldErrors(parsed.error),
+    };
+  }
+  const { email, username, password } = parsed.data;
 
   // Next đã kiểm tra Origin khớp Host cho server action, nên dùng được để tạo link xác nhận email.
   const origin = (await headers()).get("origin") ?? "http://localhost:3001";
@@ -104,10 +112,24 @@ export async function signUp(_prev: ActionState, formData: FormData): Promise<Ac
   };
 }
 
+/**
+ * Đăng xuất phiên trên thiết bị này. Supabase lỗi / mất mạng thì vẫn xóa cookie phiên để trình duyệt
+ * không còn đăng nhập, rồi báo trên trang đăng nhập.
+ */
 export async function signOut(): Promise<void> {
-  const supabase = await createClient();
-  await supabase.auth.signOut({ scope: "local" });
-  redirect("/login");
+  let failed = false;
+  try {
+    const supabase = await createClient();
+    failed = !!(await supabase.auth.signOut({ scope: "local" })).error;
+  } catch {
+    failed = true;
+  }
+  if (failed) {
+    const store = await cookies();
+    for (const cookie of store.getAll())
+      if (cookie.name.startsWith(AUTH_COOKIE_OPTIONS.name)) store.delete(cookie.name);
+  }
+  redirect(failed ? "/login?signed_out=partial" : "/login?signed_out=1");
 }
 
 export type EnrollResult = { factorId: string; qrCode: string; secret: string } | { error: string };
@@ -159,5 +181,5 @@ export async function verifyTotp(_prev: ActionState, formData: FormData): Promis
   const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
   if (error) return { error: "Mã không đúng hoặc đã hết hạn" };
 
-  redirect("/");
+  redirect(safeNextPath(formData.get("next")));
 }

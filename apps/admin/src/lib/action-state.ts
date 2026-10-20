@@ -2,6 +2,8 @@
 export interface ActionState {
   error?: string;
   message?: string;
+  /** Lỗi theo từng trường (tên trường trong form → thông báo), hiện ngay dưới ô nhập. */
+  fieldErrors?: Record<string, string>;
   /**
    * Giá trị người dùng đã nhập, trả lại khi có lỗi để điền lại form
    * (React tự xóa trắng form sau mỗi lần gửi). KHÔNG bao giờ trả lại mật khẩu.

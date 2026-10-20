@@ -5,12 +5,15 @@ import { useActionState, useState } from "react";
 import { Alert, PasswordField, PasswordStrength, SubmitButton, TextField } from "@/components/auth/form";
 import { ArrowRightIcon, LockIcon, MailIcon, UserIcon } from "@/components/icons";
 import { secondaryButtonClass } from "@/components/auth/styles";
+import { useFormCheck } from "@/components/auth/use-form-check";
+import { PASSWORD_MIN, SIGN_UP_FIELDS, SignUpInput } from "@/lib/auth-schemas";
 import type { ActionState } from "@/lib/action-state";
 import { signUp } from "../actions";
 
 export function SignupForm() {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(signUp, {});
   const [password, setPassword] = useState("");
+  const check = useFormCheck(SignUpInput, SIGN_UP_FIELDS, state.fieldErrors);
 
   // Tạo xong thì thay form bằng hướng dẫn bước tiếp theo.
   if (state.message) {
@@ -33,7 +36,13 @@ export function SignupForm() {
 
   return (
     // React tự xóa trắng form sau khi gửi: đặt lại thanh độ mạnh mật khẩu theo.
-    <form action={formAction} onReset={() => setPassword("")} className="stagger space-y-4 short:space-y-3">
+    <form
+      action={formAction}
+      onSubmit={check.onSubmit}
+      onReset={() => setPassword("")}
+      noValidate
+      className="stagger space-y-4 short:space-y-3"
+    >
       <TextField
         label="Email"
         icon={MailIcon}
@@ -42,6 +51,8 @@ export function SignupForm() {
         autoComplete="email"
         placeholder="ban@vidu.com"
         defaultValue={state.values?.email}
+        error={check.error("email")}
+        onChange={() => check.clear("email")}
         required
         autoFocus
       />
@@ -52,6 +63,8 @@ export function SignupForm() {
         autoComplete="nickname"
         placeholder="vd: lan_bientap"
         defaultValue={state.values?.username}
+        error={check.error("username")}
+        onChange={() => check.clear("username")}
         required
         minLength={3}
         maxLength={32}
@@ -64,11 +77,15 @@ export function SignupForm() {
           icon={LockIcon}
           name="password"
           autoComplete="new-password"
-          placeholder="Tối thiểu 8 ký tự"
+          placeholder={`Tối thiểu ${PASSWORD_MIN} ký tự, có chữ và số`}
           required
-          minLength={8}
+          minLength={PASSWORD_MIN}
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          error={check.error("password")}
+          onChange={(event) => {
+            setPassword(event.target.value);
+            check.clear("password");
+          }}
           hint={<PasswordStrength password={password} />}
         />
         <PasswordField
@@ -78,10 +95,12 @@ export function SignupForm() {
           autoComplete="new-password"
           placeholder="Nhập lại"
           required
-          minLength={8}
+          error={check.error("confirmPassword")}
+          onChange={() => check.clear("confirmPassword")}
         />
       </div>
-      {state.error ? <Alert tone="error">{state.error}</Alert> : null}
+      {check.offlineError ? <Alert tone="error">{check.offlineError}</Alert> : null}
+      {state.error && !check.offlineError ? <Alert tone="error">{state.error}</Alert> : null}
       <SubmitButton pending={pending} pendingText="Đang tạo tài khoản..." icon={ArrowRightIcon}>
         Đăng ký
       </SubmitButton>
