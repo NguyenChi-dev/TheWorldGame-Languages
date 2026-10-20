@@ -28,6 +28,10 @@ function isPublicPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  // Local design tool: no database needed during development. Production still requires staff + MFA.
+  if (process.env.NODE_ENV === "development" && request.nextUrl.pathname === "/map-editor") {
+    return NextResponse.next({ request });
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   // Chưa cấu hình Supabase: để trang tự báo lỗi, không chặn ở đây.

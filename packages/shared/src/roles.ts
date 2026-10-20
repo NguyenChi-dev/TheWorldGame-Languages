@@ -74,6 +74,7 @@ export const ADMIN_SECTIONS = {
     children: [
       { href: "/lands", label: "Danh sách vùng đất" },
       { href: "/lands/skills", label: "Kỹ năng luyện tập" },
+      { href: "/map-editor", label: "Thiết kế bản đồ 3D" },
     ],
   },
   words: { key: "words", href: "/words", label: "Kho từ vựng", group: "content", roles: ["admin", "editor"] },

@@ -37,6 +37,9 @@ importers:
       '@lw/assets':
         specifier: workspace:*
         version: link:../../packages/assets
+      '@lw/game':
+        specifier: workspace:*
+        version: link:../../packages/game
       '@lw/shared':
         specifier: workspace:*
         version: link:../../packages/shared
