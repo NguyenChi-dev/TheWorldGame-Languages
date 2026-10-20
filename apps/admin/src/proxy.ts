@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { AUTH_COOKIE_OPTIONS, LEGACY_AUTH_COOKIE } from "@/lib/supabase/cookie";
+import { AUTH_COOKIE_OPTIONS, LEGACY_AUTH_COOKIE, isAuthCookie } from "@/lib/supabase/cookie";
 
 /** Xóa cookie đăng nhập tên mặc định cũ (trước đây game và admin dùng chung, xem lib/supabase/cookie.ts). */
 function dropLegacyAuthCookies(request: NextRequest, response: NextResponse) {
@@ -57,7 +57,12 @@ export async function proxy(request: NextRequest) {
   // Không chèn code nào giữa createServerClient và getClaims (theo hướng dẫn của Supabase).
   const { data } = await supabase.auth.getClaims().catch(() => ({ data: null }));
 
-  if (!data?.claims && !isPublicPath(request.nextUrl.pathname)) {
+  // Server Action (POST có header Next-Action): KHÔNG chuyển hướng ở đây. Chuyển hướng giữa lúc gửi form
+  // làm trình duyệt nhận trang HTML thay vì kết quả action (lỗi khó hiểu, mất dữ liệu đang nhập).
+  // An toàn vì mọi server action tự gọi requireRole: hết phiên thì action trả lỗi "phiên hết hạn".
+  const isServerAction = request.method === "POST" && request.headers.has("next-action");
+
+  if (!data?.claims && !isPublicPath(request.nextUrl.pathname) && !isServerAction) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
@@ -65,7 +70,7 @@ export async function proxy(request: NextRequest) {
     const { pathname, search } = request.nextUrl;
     if (pathname !== "/") loginUrl.searchParams.set("next", `${pathname}${search}`);
     // Còn cookie phiên mà không đọc được phiên: phiên đã hết hạn / bị thu hồi.
-    if (request.cookies.getAll().some((cookie) => cookie.name.startsWith(AUTH_COOKIE_OPTIONS.name)))
+    if (request.cookies.getAll().some((cookie) => isAuthCookie(cookie.name)))
       loginUrl.searchParams.set("expired", "1");
     const redirect = NextResponse.redirect(loginUrl);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));

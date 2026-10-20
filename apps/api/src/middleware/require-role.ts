@@ -7,7 +7,11 @@
  *   token đã qua xác thực hai lớp (claim aal = "aal2"), trừ khi công tắc admin_settings.require_mfa
  *   đang tắt. Không đọc được công tắc thì coi như BẬT (an toàn).
  * - Route phía sau đọc vai trò bằng c.get("role").
+ * - Hỏi lại Supabase Auth bằng token (getUser): JWT ký ES256 được getClaims kiểm tra tại chỗ, nên token của
+ *   phiên đã bị thu hồi (đăng xuất mọi nơi) hoặc tài khoản đã bị khóa vẫn "hợp lệ" tới khi hết hạn (~1 giờ).
+ *   Route quản trị không chấp nhận khoảng hở đó.
  */
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { createMiddleware } from "hono/factory";
 import { isRole, isStaffRole, type Role, type StaffRole } from "@lw/shared";
 import { ApiError, Messages } from "../lib/errors.js";
@@ -25,10 +29,20 @@ export function requireRole(roles: readonly Role[]) {
     const supabase = getSupabaseAdmin();
     if (!supabase) throw new ApiError(503, Messages.supabaseNotConfigured);
 
-    const [{ data, error }, settings] = await Promise.all([
+    const [{ data, error }, settings, account] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       supabase.from("admin_settings").select("require_mfa").maybeSingle(),
+      supabase.auth
+        .getUser(c.get("accessToken"))
+        .catch((failure: unknown) => ({ data: { user: null }, error: failure })),
     ]);
+    if (account.error) {
+      const status = (account.error as { status?: number }).status ?? 0;
+      if (isAuthRetryableFetchError(account.error) || status === 0 || status >= 500)
+        throw new ApiError(503, Messages.supabaseUnavailable);
+      throw new ApiError(401, Messages.invalidSession);
+    }
+    if (account.data.user?.id !== user.id) throw new ApiError(401, Messages.invalidSession);
     if (error) {
       // Ghi chi tiết vào log máy chủ, người dùng chỉ nhận thông báo chung.
       console.error("[require-role] Không đọc được profiles:", error.message);

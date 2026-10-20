@@ -59,6 +59,18 @@ describe("proxy: chặn trang quản trị khi chưa đăng nhập", () => {
       expect((await proxy(request(path))).headers.get("location")).toBeNull();
   });
 
+  it("Server Action hết phiên: không chuyển hướng (action tự trả lỗi qua requireRole, giữ dữ liệu form)", async () => {
+    signedIn(null);
+    const action = new NextRequest("http://localhost:3001/players", {
+      method: "POST",
+      headers: { "next-action": "abc123", cookie: "lw-admin-auth=expired-token" },
+    });
+    expect((await proxy(action)).headers.get("location")).toBeNull();
+    // POST thường (không phải Server Action) vẫn bị chuyển về đăng nhập.
+    const plain = new NextRequest("http://localhost:3001/players", { method: "POST" });
+    expect((await proxy(plain)).headers.get("location")).toContain("/login");
+  });
+
   it("đã đăng nhập: cho qua (vai trò và 2 lớp do requireSection kiểm tra ở máy chủ)", async () => {
     signedIn({ sub: "u1", role: "authenticated" });
     expect((await proxy(request("/players"))).headers.get("location")).toBeNull();

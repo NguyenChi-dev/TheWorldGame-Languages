@@ -7,6 +7,8 @@ const ADMIN_TOKEN = "token-admin";
 const ADMIN_AAL1_TOKEN = "token-admin-chua-totp";
 const EDITOR_TOKEN = "token-editor";
 const MODERATOR_TOKEN = "token-moderator";
+/** JWT đúng chữ ký (getClaims qua) nhưng phiên đã bị thu hồi / tài khoản bị khóa (getUser từ chối). */
+const REVOKED_ADMIN_TOKEN = "token-admin-bi-thu-hoi";
 // aal: "aal2" = token đã qua xác thực hai lớp (TOTP), "aal1" = mới nhập mật khẩu.
 const USERS: Record<string, { sub: string; email: string; role: string; aal: string }> = {
   [PLAYER_TOKEN]: {
@@ -16,6 +18,12 @@ const USERS: Record<string, { sub: string; email: string; role: string; aal: str
     aal: "aal2",
   },
   [ADMIN_TOKEN]: {
+    sub: "22222222-2222-4222-8222-222222222222",
+    email: "admin@example.com",
+    role: "admin",
+    aal: "aal2",
+  },
+  [REVOKED_ADMIN_TOKEN]: {
     sub: "22222222-2222-4222-8222-222222222222",
     email: "admin@example.com",
     role: "admin",
@@ -60,6 +68,14 @@ vi.mock("../lib/supabase", () => ({
               error: null,
             }
           : { data: null, error: new Error("invalid JWT") };
+      },
+      getUser: async (token: string) => {
+        if (token === REVOKED_ADMIN_TOKEN)
+          return { data: { user: null }, error: { status: 403, code: "user_banned" } };
+        const user = USERS[token];
+        return user
+          ? { data: { user: { id: user.sub } }, error: null }
+          : { data: { user: null }, error: { status: 401 } };
       },
     },
     from: (table: string) => ({
@@ -258,6 +274,14 @@ describe("Quyền vào route quản trị (GET /admin/me)", () => {
     expect(await res.json()).toEqual({
       error: "Cần xác thực hai lớp (TOTP) trước khi dùng chức năng quản trị",
     });
+  });
+});
+
+describe("Phiên bị thu hồi / tài khoản bị khóa (JWT vẫn đúng chữ ký)", () => {
+  it("route quản trị trả 401, không trả dữ liệu", async () => {
+    const res = await app.request("/admin/me", asUser(REVOKED_ADMIN_TOKEN));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn" });
   });
 });
 

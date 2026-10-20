@@ -22,6 +22,8 @@ export interface AuthUser {
 export type AuthEnv = {
   Variables: {
     user: AuthUser;
+    /** Token đã kiểm tra chữ ký. Chỉ dùng ở máy chủ (requireRole hỏi lại Supabase Auth), không trả về client. */
+    accessToken: string;
   };
 };
 
@@ -55,5 +57,6 @@ export const auth = createMiddleware<AuthEnv>(async (c, next) => {
   }
 
   c.set("user", { id: claims.sub, email: claims.email || null, aal: claims.aal ?? "aal1" });
+  c.set("accessToken", token);
   await next();
 });

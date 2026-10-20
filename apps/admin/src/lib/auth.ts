@@ -12,7 +12,9 @@
  */
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import {
   ADMIN_SECTIONS,
   isRole,
@@ -21,6 +23,7 @@ import {
   type Role,
   type StaffRole,
 } from "@lw/shared";
+import { isAuthCookie } from "@/lib/supabase/cookie";
 import { createClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -51,10 +54,17 @@ export function isSignInComplete(session: Session): boolean {
   return !session.mfaRequired || session.aal === "aal2";
 }
 
-export type AuthErrorCode = "unauthenticated" | "forbidden" | "mfa_required";
+/**
+ * - unauthenticated: chưa đăng nhập / phiên hết hạn / bị thu hồi / cookie bị sửa → đăng nhập lại.
+ * - forbidden: đã đăng nhập nhưng không đủ quyền (KHÔNG phải phiên hết hạn).
+ * - mfa_required: thiếu xác thực hai lớp.
+ * - unavailable: không hỏi được Supabase Auth (mất mạng / máy chủ lỗi). Không xóa phiên, cho thử lại.
+ */
+export type AuthErrorCode = "unauthenticated" | "forbidden" | "mfa_required" | "unavailable";
 
 const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
-  unauthenticated: "Chưa đăng nhập",
+  unauthenticated: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.",
+  unavailable: "Không kết nối được máy chủ xác thực. Kiểm tra mạng rồi thử lại.",
   forbidden: "Bạn không có quyền làm việc này",
   mfa_required: "Cần xác thực hai lớp trước khi vào trang quản trị",
 };
@@ -69,7 +79,17 @@ export class AuthError extends Error {
   }
 }
 
-/** Phiên hiện tại từ cookie, hoặc null nếu chưa đăng nhập. Gọi nhiều lần trong 1 request chỉ đọc 1 lần. */
+/**
+ * Phiên hiện tại từ cookie, hoặc null nếu chưa đăng nhập / phiên không còn hiệu lực.
+ * Gọi nhiều lần trong 1 request chỉ đọc 1 lần.
+ *
+ * 2 bước xác minh:
+ *   1. getClaims: kiểm tra chữ ký + hạn dùng của JWT (Supabase tự làm mới token hết hạn bằng refresh token).
+ *   2. getUser: hỏi Supabase Auth. JWT của dự án ký ES256 nên bước 1 chạy tại chỗ, không biết phiên đã bị
+ *      thu hồi (đăng xuất mọi nơi) hay tài khoản đã bị khóa: token cũ vẫn "hợp lệ" tới ~1 giờ. Bước 2 chặn ngay.
+ *
+ * Ném AuthError("unavailable") khi không hỏi được Supabase (mất mạng): KHÔNG coi là đăng xuất.
+ */
 export const getSession = cache(async (): Promise<Session | null> => {
   const supabase = await createClient();
 
@@ -78,10 +98,19 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const claims = data?.claims;
   if (error || !claims?.sub || claims.role !== "authenticated") return null;
 
-  const [{ data: profile, error: profileError }, mfaRequired] = await Promise.all([
+  const [{ data: profile, error: profileError }, mfaRequired, account] = await Promise.all([
     supabase.from("profiles").select("role").eq("id", claims.sub).maybeSingle(),
     readMfaRequired(supabase),
+    supabase.auth.getUser().catch((error: unknown) => ({ data: { user: null }, error })),
   ]);
+  if (account.error) {
+    const error = account.error as { status?: number };
+    if (isAuthRetryableFetchError(account.error) || (error.status ?? 0) >= 500 || error.status === 0)
+      throw new AuthError("unavailable");
+    // 401/403: phiên bị thu hồi, tài khoản bị khóa hoặc đã xóa.
+    return null;
+  }
+  if (account.data.user?.id !== claims.sub) return null;
   if (profileError) throw new Error(`Không đọc được vai trò người dùng: ${profileError.message}`);
 
   return {
@@ -117,7 +146,12 @@ export async function requireSection(key: AdminSectionKey): Promise<StaffSession
     return await requireRole(ADMIN_SECTIONS[key].roles);
   } catch (error) {
     if (!(error instanceof AuthError)) throw error;
-    if (error.code === "unauthenticated") redirect("/login");
+    if (error.code === "unavailable") throw error;
+    if (error.code === "unauthenticated") {
+      // Còn cookie phiên mà vẫn bị từ chối: phiên hết hạn / bị thu hồi → báo "hết hạn" ở trang đăng nhập.
+      const stale = (await cookies()).getAll().some((cookie) => isAuthCookie(cookie.name));
+      redirect(stale ? "/login?expired=1" : "/login");
+    }
     if (error.code === "mfa_required") redirect("/login/mfa");
     // Không có quyền với trang này: về Tổng quan. Không có quyền cả Tổng quan (người chơi): về login.
     redirect(key === "overview" ? "/login?denied=1" : "/?denied=1");

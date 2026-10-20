@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { ROLE_LABELS, sectionsForRole } from "@lw/shared";
 import { ToastProvider } from "@lw/ui";
 import { BackCacheGuard } from "@/components/auth/back-cache-guard";
+import { SessionWatch } from "@/components/auth/session-watch";
 import { Sidebar } from "@/components/sidebar";
 import { SIDEBAR_COOKIE } from "@/components/sidebar-cookie";
 import { requireSection } from "@/lib/auth";
@@ -19,6 +20,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
   return (
     <div className="min-h-dvh bg-background md:flex">
       <BackCacheGuard />
+      <SessionWatch userId={session.userId} />
       <Sidebar
         items={sectionsForRole(session.role).map((section) => ({
           key: section.key,

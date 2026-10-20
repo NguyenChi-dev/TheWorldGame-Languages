@@ -20,7 +20,7 @@ import {
   signInErrorMessage,
 } from "@/lib/auth-schemas";
 import { safeNextPath, withNext } from "@/lib/safe-next";
-import { AUTH_COOKIE_OPTIONS } from "@/lib/supabase/cookie";
+import { isAuthCookie } from "@/lib/supabase/cookie";
 import { createClient } from "@/lib/supabase/server";
 
 const PLAYER_BLOCKED = "Tài khoản người chơi không được vào trang quản trị";
@@ -126,8 +126,7 @@ export async function signOut(): Promise<void> {
   }
   if (failed) {
     const store = await cookies();
-    for (const cookie of store.getAll())
-      if (cookie.name.startsWith(AUTH_COOKIE_OPTIONS.name)) store.delete(cookie.name);
+    for (const cookie of store.getAll()) if (isAuthCookie(cookie.name)) store.delete(cookie.name);
   }
   redirect(failed ? "/login?signed_out=partial" : "/login?signed_out=1");
 }

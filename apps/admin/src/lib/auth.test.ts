@@ -7,6 +7,10 @@ import { AuthError, requireRole, requireSection } from "./auth";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+const cookieJar = vi.hoisted(() => ({ names: [] as string[] }));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ getAll: () => cookieJar.names.map((name) => ({ name, value: "x" })) }),
+}));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT ${url}`);
@@ -27,6 +31,7 @@ async function authErrorCode(promise: Promise<unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  cookieJar.names = [];
 });
 
 describe("requireRole", () => {
@@ -86,6 +91,25 @@ describe("requireRole", () => {
     expect(await authErrorCode(requireRole(["admin"]))).toBe("mfa_required");
   });
 
+  it("JWT đúng chữ ký nhưng phiên đã bị thu hồi / tài khoản bị khóa: coi như chưa đăng nhập", async () => {
+    loginAs({ role: "admin", account: "revoked" });
+    expect(await authErrorCode(requireRole(["admin"]))).toBe("unauthenticated");
+  });
+
+  it("token của người khác (id không khớp) bị từ chối", async () => {
+    const fake = loginAs({ role: "admin" });
+    fake.client.auth.getUser.mockResolvedValueOnce({
+      data: { user: { id: "nguoi-khac" } },
+      error: null,
+    } as never);
+    expect(await authErrorCode(requireRole(["admin"]))).toBe("unauthenticated");
+  });
+
+  it("mất kết nối tới Supabase Auth: báo 'unavailable', không coi là đăng xuất", async () => {
+    loginAs({ role: "admin", account: "offline" });
+    expect(await authErrorCode(requireRole(["admin"]))).toBe("unavailable");
+  });
+
   it("vai trò lạ trong database cũng bị chặn", async () => {
     loginAs({ role: "superadmin" });
     expect(await authErrorCode(requireRole(STAFF_ROLES))).toBe("forbidden");
@@ -105,6 +129,19 @@ describe("requireSection", () => {
 
     loginAs({ role: "player" });
     await expect(requireSection("overview")).rejects.toThrow("REDIRECT /login?denied=1");
+  });
+
+  it("còn cookie phiên mà phiên bị từ chối: về đăng nhập kèm thông báo hết hạn", async () => {
+    cookieJar.names = ["lw-admin-auth.0", "lw-admin-sidebar"];
+    loginAs({ role: "admin", account: "revoked" });
+    await expect(requireSection("players")).rejects.toThrow("REDIRECT /login?expired=1");
+  });
+
+  it("mất kết nối: không chuyển về đăng nhập (giữ phiên), báo lỗi để thử lại", async () => {
+    loginAs({ role: "admin", account: "offline" });
+    const error = await requireSection("players").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AuthError);
+    expect((error as AuthError).code).toBe("unavailable");
   });
 });
 

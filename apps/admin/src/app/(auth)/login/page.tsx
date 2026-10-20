@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { isStaffRole } from "@lw/shared";
 import { AuthCard } from "@/components/auth/auth-card";
 import { Alert } from "@/components/auth/form";
+import { SignedOutBroadcast } from "@/components/auth/session-watch";
 import { linkClass, secondaryButtonClass } from "@/components/auth/styles";
 import { getSession, isSignInComplete, readMfaRequired } from "@/lib/auth";
 import { safeNextPath, withNext } from "@/lib/safe-next";
@@ -70,6 +71,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {params.expired ? (
           <Alert tone="info">Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để tiếp tục.</Alert>
         ) : null}
+        {params.signed_out ? <SignedOutBroadcast /> : null}
         {params.signed_out === "1" ? <Alert tone="success">Đã đăng xuất.</Alert> : null}
         {params.signed_out === "partial" ? (
           <Alert tone="info">

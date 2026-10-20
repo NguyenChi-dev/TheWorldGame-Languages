@@ -31,6 +31,10 @@ vi.mock("../lib/supabase", () => {
               }
             : { data: null, error: new Error("invalid JWT") };
         },
+        getUser: async (token: string) =>
+          TOKENS[token]
+            ? { data: { user: { id: TOKENS[token].sub } }, error: null }
+            : { data: { user: null }, error: { status: 401 } },
         resetPasswordForEmail: async (...args: unknown[]) => {
           db.calls.push({ fn: "resetPasswordForEmail", args });
           return { data: {}, error: null };
