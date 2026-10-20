@@ -25,12 +25,22 @@ export interface Place3D {
   scaling?: [number, number, number];
 }
 
+const sharedMaterials = new WeakMap<Scene, Map<string, StandardMaterial>>();
+
 export class LowPolyKit {
-  private readonly materials = new Map<string, StandardMaterial>();
+  /** Vật liệu theo màu, dùng chung cho mọi bộ dựng trong cùng scene (editor dựng hàng trăm mẫu). */
+  private readonly materials: Map<string, StandardMaterial>;
   private readonly groups = new Map<string, Mesh[]>();
   private group = "default";
 
-  constructor(readonly scene: Scene) {}
+  constructor(readonly scene: Scene) {
+    let cache = sharedMaterials.get(scene);
+    if (!cache) {
+      cache = new Map();
+      sharedMaterials.set(scene, cache);
+    }
+    this.materials = cache;
+  }
 
   /** Màu → vật liệu (dùng chung). `glow` > 0: tự phát sáng (đèn, cửa sổ ban đêm...). */
   material(hex: string, options: { alpha?: number; glow?: number } = {}) {
@@ -165,6 +175,16 @@ export class LowPolyKit {
   }
 
   /** Gộp mỗi nhóm thành một mesh. Trả về mesh của từng nhóm. */
+  /** Gộp riêng một nhóm thành một mesh, KHÔNG khóa vị trí (vật thể còn di chuyển được, ví dụ trong editor). */
+  mergeGroup(name: string): Mesh | null {
+    const meshes = this.groups.get(name);
+    this.groups.delete(name);
+    if (!meshes?.length) return null;
+    const mesh = Mesh.MergeMeshes(meshes, true, true, undefined, false, true);
+    if (mesh) mesh.name = name;
+    return mesh;
+  }
+
   mergeAll(): Map<string, Mesh> {
     const merged = new Map<string, Mesh>();
     for (const [name, meshes] of this.groups) {

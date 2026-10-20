@@ -7,8 +7,15 @@ Cũng có liên kết **Vùng đất → Thiết kế bản đồ 3D** trong men
 
 ## Thiết kế
 
-- Thêm khối hộp, trụ, cầu để phác bố cục; hoặc chọn/kéo thả file `.glb` (GLB 2.0, tối đa 50 MB/file).
-- Chọn vật thể bằng chuột trái hoặc danh sách bên trái. Chọn trục của gizmo để kéo.
+- Bảng trái có 2 tab: **Thư viện** (các mô hình GLB bạn đã thêm, có ô tìm kiếm) và **Lớp** (danh sách vật thể, ẩn/khóa).
+- Thư viện chỉ dùng file `.glb` bạn cung cấp (GLB 2.0, tối đa 50 MB/file; bấm **Thêm GLB** hoặc kéo thả vào khung 3D). Không có mẫu demo dựng sẵn.
+- Khi thêm GLB, hộp thoại hiện **ảnh minh họa** dựng từ mô hình và ô **Tên mô hình** (mặc định là tên file). Tên này thành tên file `<tên>.glb`; không được chứa `\ / : * ? " < > | # %`. Trùng tên với mô hình đã có thì mô hình cũ bị thay.
+- Mỗi thẻ thư viện có ảnh minh họa; ảnh được lưu cache trong IndexedDB (kho `thumbs`) nên lần sau mở nhanh.
+- **Đặt vật thể**: bấm một thẻ trong thư viện rồi bấm chuột trái xuống bản đồ (đặt được lên mặt trên vật khác). Bấm lại thẻ, **Esc** hoặc **Q** để thôi đặt. Có thể chọn màu, bật xoay ngẫu nhiên và kích thước ngẫu nhiên ±20%.
+- **Cọ rải**: bật trong bảng đặt, giữ chuột trái rê để rải liên tục; thanh trượt chỉnh khoảng cách giữa các vật (0,5–10 m). Khi bật Bám lưới, điểm đặt làm tròn theo ô 0,5 m.
+- Chọn vật thể bằng chuột trái hoặc tab Lớp. Chọn trục của gizmo để kéo.
+- **Ctrl+C / Ctrl+V**: sao chép và dán tại vị trí con trỏ (hoặc lệch 2 m nếu con trỏ ngoài bản đồ). **Phím mũi tên**: dịch 0,5 m (0,1 m khi tắt bám lưới, Shift ×4); **PageUp/PageDown**: nâng/hạ; **[ ]**: xoay 15°.
+- Bảng thuộc tính có nút xoay ±90°, xoay ngẫu nhiên, đặt lại góc, tỷ lệ nhanh ×0,5/×1/×1,5/×2 và bảng màu nhanh. Thanh dưới cùng hiện tọa độ X/Z của con trỏ.
 - **W**: di chuyển, **E**: xoay, **R**: đổi tỷ lệ; có thể nhập giá trị chính xác bên phải.
 - **Y** là độ cao: cho phép xếp mô hình lên nhau. Editor không chặn va chạm.
 - **Đặt xuống bề mặt**: thả từ đáy vật thể hiện tại xuống mặt gần nhất bên dưới tâm X/Z. Muốn đặt lên bàn, nâng vật thể cao hơn bàn trước khi dùng nút này. Đây không phải mô phỏng vật lý.
@@ -23,7 +30,9 @@ Cũng có liên kết **Vùng đất → Thiết kế bản đồ 3D** trong men
 
 **Xuất JSON / Ctrl+S** tải một file `.json` xuống máy. **Nhập JSON** mở lại bố cục; thao tác thay bố cục vẫn hoàn tác được.
 Bản nháp JSON tự lưu vào localStorage, GLB gốc được cache bằng IndexedDB trên trình duyệt đó.
-Không ghi lên Supabase, không upload file, không tự ghi vào source của dự án.
+Không ghi lên Supabase và không upload lên máy chủ nào.
+
+**Chế độ development:** mỗi GLB import xong còn được ghi vào `apps/web/public/models/<tên file>.glb` (qua route `/map-editor/models` của admin, chỉ có khi `NODE_ENV=development`, chỉ nhận yêu cầu từ chính trang admin). Khi mở editor, các GLB trong thư mục này tự hiện trong thư viện, kể cả ở trình duyệt / hồ sơ Chrome khác trên cùng máy. Game đọc được ở `/models/<tên file>.glb`. Import file cùng tên sẽ ghi đè file trong dự án. Production không ghi vào source dự án.
 Thay đổi ánh sáng, lưới, camera và thu gọn bảng chỉ ảnh hưởng giao diện editor, không thay tọa độ, kích thước hay màu đã lưu trong JSON. Khung 3D tạm ngừng vẽ khi tab trình duyệt bị ẩn.
 Trình duyệt có thể xóa cache; luôn giữ file JSON và GLB gốc. Mỗi tài khoản production có bộ nhớ riêng; development dùng bản nháp `local`.
 
@@ -62,6 +71,7 @@ Schema và hàm đọc/ghi: `@lw/shared/map-layout`. Editor 3D độc lập Reac
 Hệ tọa độ Babylon mặc định (left-handed), Y hướng lên, vị trí tính bằng mét; góc Euler tính bằng **độ**, tỷ lệ không có đơn vị.
 Mỗi mô hình GLB được giữ nguyên kích thước tác giả, gốc được đưa về **tâm đáy bounding box** trước khi áp dụng position/rotation/scale.
 Các khối cơ bản có kích thước 1 m trước khi áp dụng scale và cũng có gốc ở tâm đáy.
+Mẫu low-poly lưu dạng `{ "kind": "prefab", "prefab": "tree", "color": "#4fae45", ... }` (danh sách khóa: `PREFAB_KEYS`); hình dạng dựng trong `packages/game/src/maps/prefabs.ts`, `color` là màu chính.
 Thứ tự biến đổi: scale → rotation → translation. Trường `locked` là trạng thái editor; `visible` quyết định hiển thị.
 
 `source` là đường dẫn tương đối từ public của web, ví dụ `apps/web/public/models/school.glb` → `/models/school.glb`.

@@ -44,6 +44,53 @@ const common = {
   locked: z.boolean(),
 };
 
+/**
+ * Mẫu low-poly có sẵn (dựng bằng code trong @lw/game, không cần file GLB). Gốc ở tâm đáy, kích thước
+ * thật tính bằng mét trước khi áp dụng scale. `color` là màu chính (tán cây, tường nhà, mái che...).
+ */
+export const PREFAB_KEYS = [
+  "tree",
+  "pine",
+  "bush",
+  "flowers",
+  "rock",
+  "path",
+  "pond",
+  "lamp",
+  "bench",
+  "fence",
+  "house",
+  "stall",
+  "well",
+  "barrel",
+] as const;
+export type PrefabKey = (typeof PREFAB_KEYS)[number];
+
+export const PREFAB_CATEGORIES = ["nature", "street", "building"] as const;
+export type PrefabCategory = (typeof PREFAB_CATEGORIES)[number];
+export const PREFAB_CATEGORY_LABELS: Record<PrefabCategory, string> = {
+  nature: "Thiên nhiên",
+  street: "Đường phố",
+  building: "Nhà cửa",
+};
+
+export const PREFABS: Record<PrefabKey, { name: string; category: PrefabCategory; color: string }> = {
+  tree: { name: "Cây tán tròn", category: "nature", color: "#4fae45" },
+  pine: { name: "Cây thông", category: "nature", color: "#3e8f39" },
+  bush: { name: "Bụi hoa", category: "nature", color: "#3e8f39" },
+  flowers: { name: "Luống hoa", category: "nature", color: "#f26d8f" },
+  rock: { name: "Tảng đá", category: "nature", color: "#9a8f84" },
+  path: { name: "Đường lát đá", category: "street", color: "#e9c98f" },
+  pond: { name: "Hồ nước", category: "nature", color: "#3d9fd9" },
+  lamp: { name: "Đèn đường", category: "street", color: "#2f5cb0" },
+  bench: { name: "Ghế gỗ", category: "street", color: "#b9824a" },
+  fence: { name: "Hàng rào", category: "street", color: "#b9824a" },
+  house: { name: "Nhà nhỏ", category: "building", color: "#f3e6c8" },
+  stall: { name: "Quầy chợ", category: "building", color: "#d0202e" },
+  well: { name: "Giếng nước", category: "building", color: "#b9a98c" },
+  barrel: { name: "Thùng gỗ", category: "building", color: "#8a5a2b" },
+};
+
 export const MapObject = z.discriminatedUnion("kind", [
   z.strictObject({
     ...common,
@@ -51,9 +98,10 @@ export const MapObject = z.discriminatedUnion("kind", [
     source: z.string().max(500).refine(isModelPath, "Đường dẫn phải là /models/ten-file.glb"),
   }),
   z.strictObject({ ...common, kind: z.enum(["box", "cylinder", "sphere"]), color }),
+  z.strictObject({ ...common, kind: z.literal("prefab"), prefab: z.enum(PREFAB_KEYS), color }),
 ]);
 export type MapObject = z.infer<typeof MapObject>;
-export type PrimitiveKind = Exclude<MapObject["kind"], "glb">;
+export type PrimitiveKind = Exclude<MapObject["kind"], "glb" | "prefab">;
 
 export const MapLayout = z.strictObject({
   format: z.literal("language-world-map"),

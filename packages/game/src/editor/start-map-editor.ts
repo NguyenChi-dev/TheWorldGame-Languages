@@ -23,6 +23,8 @@ import {
 } from "@babylonjs/core";
 import { registerBuiltInLoaders } from "@babylonjs/loaders/dynamic";
 import { SPAWN_ID, type MapLayout, type MapObject, type MapVector } from "@lw/shared/map-layout";
+import { LowPolyKit } from "../maps/low-poly-kit";
+import { buildPrefab } from "../maps/prefabs";
 import { createEditorGround, gridStepForView } from "./editor-ground";
 
 export type EditorTool = "move" | "rotate" | "scale";
@@ -32,6 +34,16 @@ export interface EditorOptions {
   onTransform: (id: string, transform: Pick<MapObject, "position" | "rotation" | "scale">) => void;
   onModelStatus: (id: string, status: ModelStatus) => void;
   onGridStepChange?: (metres: number) => void;
+  /** Đang ở chế độ đặt vật thể: người dùng bấm (hoặc rê cọ) xuống điểm này. */
+  onPlace?: (point: MapVector) => void;
+  /** Điểm trên mặt đất / bề mặt dưới con trỏ (null: con trỏ ra ngoài). Gọi tối đa ~20 lần / giây. */
+  onPointerGround?: (point: MapVector | null) => void;
+}
+
+export interface PlacingOptions {
+  /** Cọ rải: giữ chuột rê để đặt liên tục, mỗi vật cách nhau `spacing` mét. */
+  brush: boolean;
+  spacing: number;
 }
 export interface MapEditorHandle {
   setLayout: (layout: MapLayout) => void;
@@ -43,6 +55,8 @@ export interface MapEditorHandle {
   frameAll: () => void;
   overview: (top?: boolean) => void;
   dropToSurface: () => void;
+  /** Bật / tắt chế độ đặt vật thể (bấm xuống bản đồ để đặt). null: tắt. */
+  setPlacing: (options: PlacingOptions | null) => void;
   dispose: () => void;
 }
 
@@ -165,7 +179,7 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
     if (gizmos.gizmos.positionGizmo) gizmos.gizmos.positionGizmo.snapDistance = snapping ? 0.5 : 0;
     if (gizmos.gizmos.rotationGizmo) gizmos.gizmos.rotationGizmo.snapDistance = snapping ? 15 * RAD : 0;
     if (gizmos.gizmos.scaleGizmo) gizmos.gizmos.scaleGizmo.snapDistance = snapping ? 0.1 : 0;
-    const target = editable ? (selectedRoot() ?? null) : null;
+    const target = editable && !placing ? (selectedRoot() ?? null) : null;
     if (gizmos.attachedNode !== target) gizmos.attachToNode(target);
     // Only touch the old/current selection, not every mesh in a large imported scene.
     if (highlightedId !== selectedId) {
@@ -266,6 +280,20 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
     }
   };
 
+  /** Mẫu low-poly: dựng các khối rồi gộp thành một mesh để chọn / kéo như một vật thể. */
+  const buildPrefabMesh = (entry: Entry, object: Extract<MapObject, { kind: "prefab" }>) => {
+    const kit = new LowPolyKit(scene);
+    kit.useGroup(object.id);
+    const holder = new TransformNode("prefab-holder", scene);
+    buildPrefab(kit, object.prefab, object.color, holder);
+    const mesh = kit.mergeGroup(object.id);
+    holder.dispose();
+    if (!mesh) return;
+    mesh.parent = entry.root;
+    mesh.isPickable = true;
+    mesh.metadata = { editorId: object.id };
+  };
+
   const build = (object: MapObject) => {
     const root = new TransformNode(object.id, scene);
     const entry: Entry = {
@@ -274,6 +302,12 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
       file: object.kind === "glb" ? models.get(object.source) : undefined,
     };
     entries.set(object.id, entry);
+    if (object.kind === "prefab") {
+      buildPrefabMesh(entry, object);
+      apply(entry, object);
+      options.onModelStatus(object.id, "ready");
+      return;
+    }
     let mesh: Mesh;
     if (object.kind === "sphere")
       mesh = MeshBuilder.CreateSphere(object.id, { diameter: 1, segments: 16 }, scene);
@@ -307,6 +341,9 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
       if (
         entry &&
         (entry.object.kind !== object.kind ||
+          (object.kind === "prefab" &&
+            entry.object.kind === "prefab" &&
+            (entry.object.prefab !== object.prefab || entry.object.color !== object.color)) ||
           (object.kind === "glb" &&
             (entry.object.kind !== "glb" ||
               entry.object.source !== object.source ||
@@ -352,6 +389,7 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
     if (
       (info.type !== PointerEventTypes.POINTERTAP && info.type !== PointerEventTypes.POINTERDOUBLETAP) ||
       info.event.button !== 0 ||
+      placing ||
       gizmos.isHovered ||
       gizmos.isDragging
     )
@@ -365,6 +403,97 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
       focus();
     }
   });
+  // ---------------------------------------------------------------------------
+  // Chế độ đặt vật thể: vòng tròn xem trước theo con trỏ, bấm để đặt, giữ chuột rê để rải (cọ).
+  // ---------------------------------------------------------------------------
+  let placing: PlacingOptions | null = null;
+  let brushDown = false;
+  let lastPlaced: Vector3 | null = null;
+  let lastPointerReport = 0;
+  const ghostMaterial = new StandardMaterial("place-ghost", scene);
+  ghostMaterial.disableLighting = true;
+  ghostMaterial.emissiveColor = Color3.FromHexString("#7de3c1");
+  ghostMaterial.alpha = 0.9;
+  const ghost = new TransformNode("place-ghost", scene);
+  const ghostRing = MeshBuilder.CreateTorus(
+    "place-ghost-ring",
+    { diameter: 1.4, thickness: 0.06, tessellation: 40 },
+    scene,
+  );
+  const ghostPin = MeshBuilder.CreateCylinder("place-ghost-pin", { height: 1.6, diameter: 0.05 }, scene);
+  for (const mesh of [ghostRing, ghostPin]) {
+    mesh.parent = ghost;
+    mesh.material = ghostMaterial;
+    mesh.isPickable = false;
+  }
+  ghostRing.position.y = 0.06;
+  ghostPin.position.y = 0.8;
+  ghost.setEnabled(false);
+
+  /** Điểm dưới con trỏ: mặt đất hoặc mặt trên vật thể (để đặt chồng lên). Có bám lưới thì làm tròn 0,5 m. */
+  const pointerPoint = (): Vector3 | null => {
+    const hit = scene.pick(
+      scene.pointerX,
+      scene.pointerY,
+      (mesh) =>
+        mesh.isEnabled() &&
+        mesh.isVisible &&
+        (mesh === ground || !!(mesh.metadata as { editorId?: string } | null)?.editorId) &&
+        mesh !== spawnMesh &&
+        mesh !== pole,
+    );
+    const point = hit?.pickedPoint;
+    if (!point) return null;
+    if (snapping) {
+      point.x = Math.round(point.x * 2) / 2;
+      point.z = Math.round(point.z * 2) / 2;
+    }
+    return point;
+  };
+  const place = (point: Vector3) => {
+    lastPlaced = point.clone();
+    options.onPlace?.(plain(point));
+  };
+  scene.onPointerObservable.add((info) => {
+    const event = info.event as PointerEvent;
+    if (info.type === PointerEventTypes.POINTERMOVE) {
+      const now = performance.now();
+      const point = placing || now - lastPointerReport > 50 ? pointerPoint() : null;
+      if (now - lastPointerReport > 50) {
+        lastPointerReport = now;
+        options.onPointerGround?.(point ? plain(point) : null);
+      }
+      if (!placing) return;
+      ghost.setEnabled(!!point);
+      if (point) ghost.position.copyFrom(point);
+      if (
+        brushDown &&
+        point &&
+        placing.brush &&
+        (!lastPlaced || Vector3.Distance(point, lastPlaced) >= placing.spacing)
+      )
+        place(point);
+      return;
+    }
+    if (!placing) return;
+    if (info.type === PointerEventTypes.POINTERDOWN && event.button === 0) {
+      // Bắt đầu nét cọ kể cả khi bấm ngoài mặt đất: rê vào bản đồ sẽ rải tiếp.
+      brushDown = true;
+      const point = pointerPoint();
+      if (!point) return;
+      place(point);
+    } else if (info.type === PointerEventTypes.POINTERUP && event.button === 0) {
+      brushDown = false;
+      lastPlaced = null;
+    }
+  });
+  const onPointerOut = () => {
+    ghost.setEnabled(false);
+    brushDown = false;
+    options.onPointerGround?.(null);
+  };
+  canvas.addEventListener("pointerleave", onPointerOut);
+
   const onContextMenu = (event: Event) => event.preventDefault();
   canvas.addEventListener("contextmenu", onContextMenu);
   const resize = () => engine.resize();
@@ -427,6 +556,18 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
       const halfDepth = (layout?.ground.depth ?? 48) / 2;
       frameBounds(new Vector3(-halfWidth, 0, -halfDepth), new Vector3(halfWidth, 0, halfDepth));
     },
+    setPlacing(next) {
+      placing = next;
+      brushDown = false;
+      lastPlaced = null;
+      ghostRing.scaling.setAll(next?.brush ? Math.max(1, next.spacing * 0.9) : 1);
+      if (!next) ghost.setEnabled(false);
+      // Đang đặt: ẩn gizmo để bấm không vướng.
+      if (next) gizmos.attachToNode(null);
+      else attach();
+      if (canvas.style) canvas.style.cursor = next ? "crosshair" : "";
+      scene.defaultCursor = next ? "crosshair" : "default";
+    },
     dropToSurface() {
       const root = selectedRoot();
       if (!root || !selectedId || entries.get(selectedId)?.object.locked) return;
@@ -457,6 +598,7 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
       observer.disconnect();
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("contextmenu", onContextMenu);
+      canvas.removeEventListener("pointerleave", onPointerOut);
       engine.stopRenderLoop();
       for (const id of entries.keys()) remove(id);
       gizmos.dispose();
@@ -470,3 +612,5 @@ export function startMapEditor(canvas: HTMLCanvasElement, options: EditorOptions
     },
   };
 }
+
+export { renderModelThumbnail } from "./model-thumbnail";

@@ -11,6 +11,6 @@ const MapEditor = dynamic(() => import("./map-editor"), {
   ),
 });
 
-export function EditorLoader({ storageKey }: { storageKey: string }) {
-  return <MapEditor storageKey={storageKey} />;
+export function EditorLoader({ storageKey, projectModels }: { storageKey: string; projectModels: boolean }) {
+  return <MapEditor storageKey={storageKey} projectModels={projectModels} />;
 }

@@ -134,6 +134,32 @@ describe("3D editor runtime", () => {
     expect(scene.getTransformNodeByName("table")).toBeNull();
   });
 
+  it("builds a low-poly prefab as ONE pickable mesh and rebuilds it when its colour changes", () => {
+    const scene = runtime.engine!.scenes[0];
+    const tree = {
+      ...object("tree-1"),
+      kind: "prefab" as const,
+      prefab: "tree" as const,
+      color: "#4fae45",
+    };
+    editor.setLayout({ ...emptyMap(), objects: [tree] });
+    const root = scene.getTransformNodeByName("tree-1")!;
+    const meshes = root.getChildMeshes();
+    expect(meshes).toHaveLength(1);
+    expect(meshes[0].isPickable).toBe(true);
+    expect(meshes[0].metadata).toEqual({ editorId: "tree-1" });
+    expect(onModelStatus).toHaveBeenCalledWith("tree-1", "ready");
+    editor.setLayout({ ...emptyMap(), objects: [{ ...tree, color: "#ff0000" }] });
+    expect(scene.getTransformNodeByName("tree-1")!.getChildMeshes()).toHaveLength(1);
+    expect(scene.getTransformNodeByName("tree-1")).not.toBe(root);
+  });
+
+  it("place mode detaches the gizmo so clicks place instead of manipulating", () => {
+    editor.setPlacing({ brush: false, spacing: 2 });
+    expect(runtime.gizmos!.attachedNode).toBeNull();
+    editor.setPlacing(null);
+  });
+
   it("drops an elevated object onto another object instead of through it to the ground", () => {
     editor.setLayout({ ...emptyMap(), objects: [object("table"), object("pot", 5)] });
     runtime.engine!.scenes[0].render();

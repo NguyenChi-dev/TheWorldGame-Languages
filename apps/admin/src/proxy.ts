@@ -72,6 +72,8 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Chạy cho mọi đường dẫn, trừ file tĩnh của Next, ảnh tối ưu và favicon.
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Trừ cả /map-editor/models (route dev-only, production luôn trả 404): proxy chỉ đệm 10 MB thân yêu cầu,
+    // file GLB lớn hơn sẽ bị cắt cụt nếu đi qua proxy.
+    "/((?!_next/static|_next/image|favicon.ico|map-editor/models|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
