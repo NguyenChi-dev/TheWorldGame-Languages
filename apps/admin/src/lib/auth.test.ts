@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { STAFF_ROLES, sectionsForRole, type Role } from "@lw/shared";
+import { ADMIN_SECTIONS, STAFF_ROLES, activeSectionTab, sectionsForRole, type Role } from "@lw/shared";
 import { createClient } from "@/lib/supabase/server";
 import { fakeSupabase, type FakeUser } from "@/test/fake-supabase";
 import { logAction } from "./audit";
@@ -174,25 +174,59 @@ describe("requireSection", () => {
 
 describe("bảng phân quyền menu", () => {
   it.each<[Role, string[]]>([
-    ["admin", ["/", "/lands", "/words", "/media", "/economy", "/players", "/logs", "/settings"]],
-    ["editor", ["/", "/lands", "/words", "/media"]],
+    ["admin", ["/", "/lands", "/words", "/lessons", "/media", "/economy", "/players", "/logs", "/settings"]],
+    ["editor", ["/", "/lands", "/words", "/lessons", "/media"]],
     ["moderator", ["/", "/players"]],
     ["player", []],
   ])("%s thấy đúng các trang", (role, hrefs) => {
     expect(sectionsForRole(role).map((section) => section.href)).toEqual(hrefs);
   });
 
-  it("thanh bên chia nhóm Nội dung học · Kinh tế · Vận hành, không còn mục Bài học riêng", () => {
+  it("thanh bên: 8 mục chính đúng thứ tự (+ Cài đặt bảo mật), chia nhóm Nội dung học · Kinh tế · Vận hành", () => {
     expect(sectionsForRole("admin").map((section) => [section.label, section.group])).toEqual([
       ["Tổng quan", null],
-      ["Vùng đất", "content"],
+      ["Vùng đất và khu vực", "content"],
       ["Kho từ vựng", "content"],
+      ["Bài học", "content"],
       ["Media", "content"],
       ["Vật phẩm và kinh tế", "economy"],
       ["Người chơi và báo cáo", "operations"],
       ["Nhật ký", "operations"],
       ["Cài đặt bảo mật", "operations"],
     ]);
+  });
+});
+
+describe("tab của mục chính (?tab=)", () => {
+  it("mỗi mục có đúng các tab theo thiết kế", () => {
+    expect(
+      Object.fromEntries(Object.values(ADMIN_SECTIONS).map((s) => [s.href, s.tabs.map((t) => t.label)])),
+    ).toEqual({
+      "/": [
+        "Người chơi mới và đang hoạt động",
+        "Bài học hoàn thành",
+        "Từ hay sai nhiều",
+        "Vàng đang lưu hành",
+      ],
+      "/lands": ["Vùng đất (ngôn ngữ)", "Khu vực (kỹ năng)", "Bật/tắt và thứ tự mở khóa"],
+      "/words": ["Danh sách và bộ lọc", "Nhập CSV", "Lỗi khi nhập"],
+      "/lessons": ["Danh sách bài học", "Câu hỏi theo kỹ năng", "Nháp và xuất bản"],
+      "/media": ["Mô hình 3D", "Hình ảnh", "Âm thanh"],
+      "/economy": ["Giá mua/bán", "Thời gian cây lớn", "Phần thưởng", "Lịch sử thay đổi và hoàn tác"],
+      "/players": ["Tiến độ người chơi", "Báo cáo và khóa chat", "Khóa tài khoản", "Tặng vàng"],
+      "/logs": ["Toàn bộ thao tác"],
+      "/settings": [],
+    });
+  });
+
+  it("?tab đúng thì mở tab đó; sai / thiếu thì tab có chức năng đầu tiên, không có thì tab đầu", () => {
+    expect(activeSectionTab(ADMIN_SECTIONS.words, "import")?.key).toBe("import");
+    expect(activeSectionTab(ADMIN_SECTIONS.words, undefined)?.key).toBe("list");
+    expect(activeSectionTab(ADMIN_SECTIONS.words, "khong-co")?.key).toBe("list");
+    expect(activeSectionTab(ADMIN_SECTIONS.players, undefined)?.key).toBe("accounts");
+    expect(activeSectionTab(ADMIN_SECTIONS.media, undefined)?.key).toBe("images");
+    expect(activeSectionTab(ADMIN_SECTIONS.lands, ["skills", "x"])?.key).toBe("skills");
+    expect(activeSectionTab(ADMIN_SECTIONS.settings, "x")).toBeNull();
   });
 });
 

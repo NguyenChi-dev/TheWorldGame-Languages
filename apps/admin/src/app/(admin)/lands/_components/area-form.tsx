@@ -78,7 +78,7 @@ export function AreaForm({
                 <>
                   Chưa có kỹ năng nào.{" "}
                   <Link
-                    href="/lands/skills"
+                    href="/lands?tab=skills"
                     className="font-semibold text-accent underline underline-offset-2"
                   >
                     Thêm kỹ năng

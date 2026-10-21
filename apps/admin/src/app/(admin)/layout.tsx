@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { ROLE_LABELS, sectionsForRole } from "@lw/shared";
 import { ToastProvider } from "@lw/ui";
+import { ShinyText } from "@lw/ui/lightswind";
 import { BackCacheGuard } from "@/components/auth/back-cache-guard";
 import { SessionWatch } from "@/components/auth/session-watch";
 import { Sidebar } from "@/components/sidebar";
@@ -35,6 +36,13 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
         needsMfa={session.aal !== "aal2"}
       />
       <main className="min-w-0 flex-1 p-4 md:p-6">
+        {/* Thanh tiêu đề (máy tính; trên điện thoại thanh bên đã là dải tiêu đề). Bên phải để trống cho tên người dùng. */}
+        <header className="mx-auto mb-5 hidden max-w-6xl items-center justify-between border-b border-secondary pb-3 md:flex">
+          <p className="font-game text-base font-bold text-accent">
+            <ShinyText speed={4}>Language World Admin</ShinyText>
+          </p>
+          <div data-slot="user" className="min-h-8 min-w-32" />
+        </header>
         {/* ToastProvider: thông báo thành công / lỗi (toast) cho mọi trang quản trị. */}
         <ToastProvider>
           <div className="mx-auto max-w-6xl">{children}</div>

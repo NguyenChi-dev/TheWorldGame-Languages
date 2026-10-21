@@ -1,10 +1,12 @@
-/** Tiêu đề trang quản trị, kèm mô tả ngắn nếu có. */
+import { Reveal } from "@lw/ui/motion";
+
+/** Tiêu đề trang quản trị, kèm mô tả ngắn nếu có. Hiện dần bằng GSAP (Reveal) khi mở trang. */
 export function PageTitle({ children, description }: { children: React.ReactNode; description?: string }) {
   return (
-    <div className="mb-5">
+    <Reveal className="mb-5" stagger={0.08}>
       <h1 className="font-game text-2xl font-extrabold leading-tight text-slate-900">{children}</h1>
       {description ? <p className="mt-0.5 text-sm text-slate-500">{description}</p> : null}
-    </div>
+    </Reveal>
   );
 }
 

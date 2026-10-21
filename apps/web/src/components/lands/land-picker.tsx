@@ -13,6 +13,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
+import { gsap, useGSAP } from "@lw/ui/motion";
 import { chooseLand } from "@/app/(world)/lands/actions";
 import { signOut } from "@/app/(world)/login/actions";
 import { Notice, SubmitButton } from "@/components/auth/auth-panel";
@@ -98,6 +99,25 @@ export function LandPicker({ lands, currentLandId }: { lands: LandOption[]; curr
   const selected = lands.find((land) => land.id === selectedId) ?? null;
 
   const railRef = useRef<HTMLDivElement>(null);
+  // Thẻ vùng đất bay lên lần lượt khi mở trang (GSAP). Bật "giảm chuyển động" thì hiện ngay.
+  useGSAP(
+    () => {
+      const media = gsap.matchMedia();
+      media.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.from(".land-card", {
+          y: 36,
+          autoAlpha: 0,
+          rotate: -2,
+          duration: 0.6,
+          ease: "back.out(1.6)",
+          stagger: 0.08,
+          clearProps: "opacity,visibility,transform",
+        });
+      });
+      return () => media.revert();
+    },
+    { scope: railRef },
+  );
   const [overflow, setOverflow] = useState({ left: false, right: false });
 
   // Hiện nút mũi tên khi hàng thẻ dài hơn màn hình.

@@ -4,6 +4,7 @@ import type { ComponentType, SVGProps } from "react";
 import type { AdminSectionKey } from "@lw/shared";
 import {
   BookIcon,
+  CapIcon,
   ClipboardIcon,
   CoinIcon,
   HomeIcon,
@@ -25,6 +26,7 @@ export const SECTION_META: Record<AdminSectionKey, SectionMeta> = {
   media: { icon: ImageIcon, description: "Ảnh, âm thanh dùng trong game." },
   economy: { icon: CoinIcon, description: "Vật phẩm, giá mua bán và phần thưởng." },
   players: { icon: UsersIcon, description: "Tài khoản, vai trò và báo cáo vi phạm." },
+  lessons: { icon: CapIcon, description: "Bài học và câu hỏi của từng khu vực." },
   logs: { icon: ClipboardIcon, description: "Ai đã làm gì, lúc nào, vì sao." },
   settings: { icon: ShieldIcon, description: "Bắt buộc xác thực hai lớp cho nhân viên." },
 };

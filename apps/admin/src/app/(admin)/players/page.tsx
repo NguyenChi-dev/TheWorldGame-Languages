@@ -21,7 +21,8 @@ import {
 } from "@lw/shared/api";
 import { FaIcon } from "@/components/fa-icon";
 import { fieldClass } from "@/components/fields";
-import { PageTitle } from "@/components/page-title";
+import { PageHeader, sectionTabs } from "@/components/page-header";
+import { PlaceholderPanel } from "@/components/placeholder-panel";
 import { Tabs } from "@/components/tabs";
 import { ApiCallError, apiRequest } from "@/lib/api";
 import { requireSection } from "@/lib/auth";
@@ -29,7 +30,13 @@ import { PlayerActions } from "./_components/player-actions";
 
 export const metadata: Metadata = { title: ADMIN_SECTIONS.players.label };
 
-type SearchParams = Promise<{ group?: string; search?: string; status?: string; page?: string }>;
+type SearchParams = Promise<{
+  tab?: string;
+  group?: string;
+  search?: string;
+  status?: string;
+  page?: string;
+}>;
 
 const PER_PAGE = 20;
 
@@ -84,6 +91,17 @@ function StatCard({
 export default async function PlayersPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await requireSection("players");
   const params = await searchParams;
+  // Mục con của trang (?tab=). Tab chưa làm thì chỉ hiện khung "Sắp có", không gọi API.
+  const { active, bar } = sectionTabs("players", params.tab);
+  if (active && !active.ready) {
+    return (
+      <>
+        <PageHeader section="players" />
+        {bar}
+        <PlaceholderPanel title={active.label} />
+      </>
+    );
+  }
   const group: AccountGroup = params.group === "staff" ? "staff" : "players";
   const search = (params.search ?? "").trim();
   const status = PLAYER_STATUSES.includes(params.status as PlayerStatus)
@@ -132,9 +150,11 @@ export default async function PlayersPage({ searchParams }: { searchParams: Sear
 
   return (
     <>
-      <PageTitle description="Tài khoản đăng ký / đăng nhập: xác nhận email, đặt lại mật khẩu, khóa, xóa, đổi vai trò.">
-        {ADMIN_SECTIONS.players.label}
-      </PageTitle>
+      <PageHeader section="players" />
+      {bar}
+      <p className="-mt-2 mb-3 text-sm text-slate-500">
+        Tài khoản đăng ký / đăng nhập: xác nhận email, đặt lại mật khẩu, khóa, xóa, đổi vai trò.
+      </p>
 
       <Tabs
         active={group}

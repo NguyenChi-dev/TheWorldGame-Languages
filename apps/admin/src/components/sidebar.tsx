@@ -7,6 +7,8 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { ADMIN_SECTION_GROUPS, type AdminSectionGroup, type AdminSectionKey } from "@lw/shared";
 import logo from "@lw/assets/Logo.png";
 import { signOut } from "@/app/(auth)/actions";
+import { faBars, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { FaIcon } from "@/components/fa-icon";
 import { LogOutIcon, ShieldIcon, SidebarToggleIcon } from "@/components/icons";
 import { SECTION_META } from "@/components/section-meta";
 import { SIDEBAR_COOKIE } from "@/components/sidebar-cookie";
@@ -47,7 +49,7 @@ function SignOutButton() {
 /**
  * Thanh bên gọn: logo nhỏ, menu có icon chia theo nhóm, thẻ người dùng 1 dòng.
  * - Máy tính: thu gọn còn cột icon (nút ở cuối menu, hoặc Ctrl/⌘ + B); rê chuột vào icon để xem tên.
- * - Điện thoại: thành dải trên cùng, menu cuộn ngang (không thu gọn).
+ * - Điện thoại: menu thu vào nút ☰ ở dải trên cùng, bấm để mở danh sách dọc (chuyển trang thì tự đóng).
  * Danh sách `items` đã được lọc theo vai trò ở máy chủ (app/(admin)/layout.tsx).
  */
 export function Sidebar({
@@ -66,6 +68,14 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  /** Điện thoại: menu thu vào nút ☰, mở ra thành danh sách dọc. */
+  const [mobileOpen, setMobileOpen] = useState(false);
+  // Chuyển trang thì đóng menu điện thoại.
+  const [openedAt, setOpenedAt] = useState(pathname);
+  if (openedAt !== pathname) {
+    setOpenedAt(pathname);
+    setMobileOpen(false);
+  }
 
   const toggle = useCallback(() => {
     const next = !collapsed;
@@ -105,12 +115,25 @@ export function Sidebar({
             LW Admin
           </span>
         </Link>
-        <div className="md:hidden">
+        <div className="flex items-center gap-1 md:hidden">
           <SignOutButton />
+          <button
+            type="button"
+            onClick={() => setMobileOpen((open) => !open)}
+            aria-expanded={mobileOpen}
+            aria-controls="admin-nav"
+            aria-label={mobileOpen ? "Đóng menu" : "Mở menu"}
+            className="flex size-9 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-secondary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <FaIcon icon={mobileOpen ? faXmark : faBars} />
+          </button>
         </div>
       </div>
 
-      <nav className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-1 md:flex-col md:overflow-y-auto md:overflow-x-hidden md:py-2">
+      <nav
+        id="admin-nav"
+        className={`${mobileOpen ? "flex" : "hidden"} flex-col gap-1 px-2 pb-2 md:flex md:flex-1 md:overflow-y-auto md:overflow-x-hidden md:py-2`}
+      >
         {items.map((item, index) => {
           // Route con (ví dụ /lands/en/areas/...) vẫn tô sáng mục cha.
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

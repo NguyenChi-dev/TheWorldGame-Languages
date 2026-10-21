@@ -10,6 +10,9 @@ import {
 import { Alert } from "@/components/auth/form";
 import { Card } from "@/components/card";
 import { PageTitle } from "@/components/page-title";
+import { StatCard } from "@/components/stat-card";
+import { CountUp } from "@lw/ui/lightswind";
+import { Reveal } from "@lw/ui/motion";
 import { SECTION_META } from "@/components/section-meta";
 import { requireSection } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -90,8 +93,15 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </div>
       ) : null}
 
+      {/* Chỉ số học tập và kinh tế: chưa có dữ liệu (game chưa ghi tiến độ / vàng), hiện "—". */}
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {ADMIN_SECTIONS.overview.tabs.map((metric) => (
+          <StatCard key={metric.key} label={metric.label} />
+        ))}
+      </div>
+
       {/* Số liệu tổng: bấm vào để tới trang quản lý tương ứng (nếu vai trò được vào). */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <Reveal className="grid grid-cols-2 gap-3 lg:grid-cols-4" delay={0.1}>
         {stats
           .filter((stat) => stat.show)
           .map((stat) => {
@@ -103,7 +113,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                   {stat.label}
                   <Icon className="size-4.5 text-primary" />
                 </div>
-                <p className="mt-1 font-game text-3xl font-extrabold text-slate-900">{stat.value ?? "—"}</p>
+                <p className="mt-1 font-game text-3xl font-extrabold text-slate-900">
+                  {typeof stat.value === "number" ? <CountUp value={stat.value} /> : "—"}
+                </p>
               </>
             );
             const className = "rounded-2xl border border-secondary bg-white p-4 shadow-sm";
@@ -121,7 +133,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
               </div>
             );
           })}
-      </div>
+      </Reveal>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {logs ? (

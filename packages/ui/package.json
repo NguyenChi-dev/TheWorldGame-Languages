@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./motion": "./src/motion/index.ts",
+    "./lightswind": "./src/lightswind/index.ts"
   },
   "scripts": {
     "lint": "eslint",
@@ -22,5 +24,12 @@
     "react": "19.3.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.2"
+  },
+  "dependencies": {
+    "@gsap/react": "2.1.2",
+    "clsx": "2.1.1",
+    "framer-motion": "12.43.0",
+    "gsap": "3.15.0",
+    "tailwind-merge": "3.7.0"
   }
 }
