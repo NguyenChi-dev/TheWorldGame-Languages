@@ -7,6 +7,7 @@ import {
   confirmPlayerEmail,
   deletePlayer,
   renamePlayer,
+  resetStaffMfa,
   sendPlayerPasswordReset,
   unbanPlayer,
 } from "./actions";
@@ -15,10 +16,18 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAction: vi.fn() }));
-vi.mock("@/lib/auth", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/auth")>()),
-  requireRole: vi.fn(),
-}));
+vi.mock("@/lib/auth", async (importOriginal) => {
+  const { rolesFor } = await import("@lw/shared");
+  const requireRole = vi.fn();
+  return {
+    ...(await importOriginal<typeof import("@/lib/auth")>()),
+    requireRole,
+    // Cùng vai trò như requireRole thật; bước AAL2 của requirePermission có test riêng ở lib/auth.test.ts.
+    requirePermission: vi.fn((permission: Parameters<typeof rolesFor>[0]) =>
+      requireRole(rolesFor(permission)),
+    ),
+  };
+});
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   apiRequest: vi.fn(),
@@ -68,6 +77,13 @@ describe("thao tác tài khoản người chơi (gọi apps/api)", () => {
       `/admin/players/${ID}`,
       "PATCH",
       { username: "Mèo" },
+    ],
+    [
+      "resetStaffMfa",
+      () => resetStaffMfa(ID, { reason: "Mất điện thoại" }),
+      `/admin/players/${ID}/mfa-reset`,
+      "POST",
+      { reason: "Mất điện thoại" },
     ],
     [
       "deletePlayer",

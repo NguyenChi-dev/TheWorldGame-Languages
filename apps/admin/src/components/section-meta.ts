@@ -9,6 +9,7 @@ import {
   HomeIcon,
   ImageIcon,
   MapIcon,
+  ShieldIcon,
   UsersIcon,
 } from "@/components/icons";
 
@@ -25,4 +26,5 @@ export const SECTION_META: Record<AdminSectionKey, SectionMeta> = {
   economy: { icon: CoinIcon, description: "Vật phẩm, giá mua bán và phần thưởng." },
   players: { icon: UsersIcon, description: "Tài khoản, vai trò và báo cáo vi phạm." },
   logs: { icon: ClipboardIcon, description: "Ai đã làm gì, lúc nào, vì sao." },
+  settings: { icon: ShieldIcon, description: "Bắt buộc xác thực hai lớp cho nhân viên." },
 };

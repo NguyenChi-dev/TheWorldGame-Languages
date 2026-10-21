@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { rolesFor } from "@lw/shared";
+import { requiresAal2, rolesFor } from "@lw/shared";
 import {
   AdminBanRequest,
   AdminPlayerParams,
@@ -27,7 +27,9 @@ import { FOREVER_BAN, getPlayer, listPlayers, updateAuthUser } from "../services
  *   - Khóa / xóa chỉ áp dụng cho tài khoản 'player'. Tài khoản nhân viên phải hạ vai trò trước
  *     (đổi vai trò làm ở trang admin, có ghi nhật ký riêng).
  */
-const ADMIN_ONLY = requireRole(rolesFor("players.manage"));
+const ADMIN_ONLY = requireRole(rolesFor("players.manage"), { aal2: requiresAal2("players.manage") });
+/** Thao tác trên tài khoản nhân viên (đặt lại 2 lớp): quyền staff.manage, luôn cần AAL2. */
+const STAFF_MANAGER = requireRole(rolesFor("staff.manage"), { aal2: requiresAal2("staff.manage") });
 
 function supabaseOrFail() {
   const supabase = getSupabaseAdmin();
@@ -194,6 +196,52 @@ export const adminPlayerRoutes = new Hono<StaffEnv>()
         c,
         { action: "players.rename", target, before: { username: target.username }, after: { username } },
         `Đã đổi tên thành ${username}`,
+        after,
+      );
+    },
+  )
+
+  /**
+   * Đặt lại xác thực hai lớp của NHÂN VIÊN KHÁC (mất điện thoại / đổi máy): xóa mọi khóa TOTP.
+   * Lần đăng nhập tới họ sẽ được yêu cầu quét mã QR mới. Chỉ admin đã qua 2 lớp, không tự đặt lại cho mình.
+   */
+  .post(
+    "/:id/mfa-reset",
+    STAFF_MANAGER,
+    validate("param", AdminPlayerParams),
+    validate("json", AdminReasonRequest),
+    async (c) => {
+      const { reason } = c.req.valid("json");
+      const target = await loadTarget(c, c.req.valid("param").id);
+      const supabase = supabaseOrFail();
+      const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId: target.id });
+      if (error) {
+        console.error("[players] Không đọc được thiết bị xác thực:", error.message);
+        throw new ApiError(500, Messages.internal);
+      }
+      const factors = data?.factors ?? [];
+      if (!factors.length) throw new ApiError(409, "Tài khoản này chưa thiết lập xác thực hai lớp");
+      for (const factor of factors) {
+        const { error: deleteError } = await supabase.auth.admin.mfa.deleteFactor({
+          id: factor.id,
+          userId: target.id,
+        });
+        if (deleteError) {
+          console.error("[players] Không xóa được thiết bị xác thực:", deleteError.message);
+          throw new ApiError(500, Messages.internal);
+        }
+      }
+      const after = await getPlayer(supabase, target.id);
+      return done(
+        c,
+        {
+          action: "auth.mfa_reset",
+          target,
+          before: { factors: factors.map((f) => ({ id: f.id, type: f.factor_type, status: f.status })) },
+          after: { factors: [] },
+          reason,
+        },
+        `Đã đặt lại xác thực hai lớp cho ${who(target)}. Lần đăng nhập tới họ sẽ quét mã QR mới.`,
         after,
       );
     },

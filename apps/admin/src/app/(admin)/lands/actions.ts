@@ -19,13 +19,22 @@ import { rolesFor, type StaffRole } from "@lw/shared";
 import { AreaInput, IdList, LandInput, SkillInput } from "@lw/shared/schemas";
 import type { ActionResult } from "@/lib/action-state";
 import { logAction, type LogActionInput } from "@/lib/audit";
-import { AuthError, requireRole } from "@/lib/auth";
+import { AuthError, requirePermission, requireRole } from "@/lib/auth";
 import { UUID } from "@/lib/content";
 import { createClient } from "@/lib/supabase/server";
 
 const CONTENT_EDITORS = rolesFor("content.update");
 /** Xóa vùng đất / khu vực / kỹ năng không hoàn tác được: chỉ admin. Editor tắt is_active để ẩn. */
-const DELETERS = rolesFor("content.delete");
+/** Xóa: requirePermission("content.delete") — chỉ admin và luôn cần xác thực hai lớp. */
+async function deleteGuard(): Promise<string | null> {
+  try {
+    await requirePermission("content.delete");
+    return null;
+  } catch (error) {
+    if (error instanceof AuthError) return error.message;
+    throw error;
+  }
+}
 
 type Row = Record<string, unknown>;
 
@@ -381,7 +390,7 @@ export async function reorderAreas(landId: string, ids: unknown): Promise<Action
 
 /** Xóa vĩnh viễn một khu vực. Chỉ admin; phải gõ đúng tên khu vực để xác nhận. */
 export async function deleteArea(id: string, confirmName: string): Promise<ActionResult> {
-  const denied = await guard(DELETERS);
+  const denied = await deleteGuard();
   if (denied) return fail(denied);
   if (!UUID.test(id)) return fail("Mã khu vực không hợp lệ");
 
@@ -411,7 +420,7 @@ export async function deleteArea(id: string, confirmName: string): Promise<Actio
  * Vùng đất còn khu vực thì không xóa (database cũng chặn bằng ON DELETE RESTRICT).
  */
 export async function deleteLand(id: string, confirmSlug: string): Promise<ActionResult> {
-  const denied = await guard(DELETERS);
+  const denied = await deleteGuard();
   if (denied) return fail(denied);
   if (!UUID.test(id)) return fail("Mã vùng đất không hợp lệ");
 
@@ -548,7 +557,7 @@ export async function reorderSkills(ids: unknown): Promise<ActionResult> {
  * Kỹ năng đang được khu vực dùng thì không xóa (database cũng chặn bằng ON DELETE RESTRICT).
  */
 export async function deleteSkill(id: string, confirmName: string): Promise<ActionResult> {
-  const denied = await guard(DELETERS);
+  const denied = await deleteGuard();
   if (denied) return fail(denied);
   if (!UUID.test(id)) return fail("Mã kỹ năng không hợp lệ");
 

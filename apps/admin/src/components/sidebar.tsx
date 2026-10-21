@@ -7,7 +7,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { ADMIN_SECTION_GROUPS, type AdminSectionGroup, type AdminSectionKey } from "@lw/shared";
 import logo from "@lw/assets/Logo.png";
 import { signOut } from "@/app/(auth)/actions";
-import { LogOutIcon, SidebarToggleIcon } from "@/components/icons";
+import { LogOutIcon, ShieldIcon, SidebarToggleIcon } from "@/components/icons";
 import { SECTION_META } from "@/components/section-meta";
 import { SIDEBAR_COOKIE } from "@/components/sidebar-cookie";
 
@@ -55,11 +55,14 @@ export function Sidebar({
   email,
   roleLabel,
   defaultCollapsed = false,
+  needsMfa = false,
 }: {
   items: SidebarItem[];
   email: string | null;
   roleLabel: string;
   defaultCollapsed?: boolean;
+  /** Phiên chưa qua xác thực hai lớp (công tắc 2 lớp đang tắt): hiện nút để xác thực bổ sung. */
+  needsMfa?: boolean;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -204,6 +207,16 @@ export function Sidebar({
           </p>
           <p className="text-[11px] text-slate-500">{roleLabel}</p>
         </div>
+        {needsMfa ? (
+          <Link
+            href={`/login/mfa?next=${encodeURIComponent(pathname)}`}
+            aria-label="Xác thực hai lớp"
+            title="Xác thực hai lớp: cần cho đổi vai trò, quản lý tài khoản người chơi, xóa nội dung"
+            className="flex size-8 items-center justify-center rounded-lg text-amber-600 transition-colors hover:bg-secondary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <ShieldIcon className="size-4.5" />
+          </Link>
+        ) : null}
         <SignOutButton />
       </div>
     </aside>

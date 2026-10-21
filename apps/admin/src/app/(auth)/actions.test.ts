@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { USERNAME_RULE } from "@lw/shared";
 import { getSession, readMfaRequired } from "@/lib/auth";
-import { SIGN_UP_FIELDS, SignUpInput, parseForm, signInErrorMessage } from "@/lib/auth-schemas";
+import {
+  SIGN_UP_FIELDS,
+  SignUpInput,
+  parseForm,
+  signInErrorMessage,
+  totpErrorMessage,
+} from "@/lib/auth-schemas";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { signIn, signOut, signUp, verifyTotp } from "./actions";
+import { cancelTotpEnroll, signIn, signOut, signUp, startTotpEnroll, verifyTotp } from "./actions";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
@@ -31,7 +37,8 @@ function fakeSupabase(
     signUpSession?: object | null;
     signUpErrorCode?: string;
     signOutError?: boolean;
-    verifyError?: boolean;
+    verifyError?: boolean | { code?: string; status?: number };
+    factors?: { id: string; factor_type: string; status: string }[];
   } = {},
 ) {
   const auth = {
@@ -47,8 +54,27 @@ function fakeSupabase(
     })),
     signOut: vi.fn(async () => ({ error: options.signOutError ? { message: "network" } : null })),
     mfa: {
-      listFactors: vi.fn(async () => ({ data: { totp: [{ id: "f1" }], all: [] }, error: null })),
-      challengeAndVerify: vi.fn(async () => ({ error: options.verifyError ? { message: "bad" } : null })),
+      listFactors: vi.fn(async () => ({
+        data: {
+          totp: (options.factors ?? [{ id: "f1", factor_type: "totp", status: "verified" }]).filter(
+            (f) => f.status === "verified",
+          ),
+          all: options.factors ?? [{ id: "f1", factor_type: "totp", status: "verified" }],
+        },
+        error: null,
+      })),
+      challengeAndVerify: vi.fn(async () => ({
+        error: options.verifyError
+          ? options.verifyError === true
+            ? { message: "bad" }
+            : options.verifyError
+          : null,
+      })),
+      enroll: vi.fn(async () => ({
+        data: { id: "f-new", totp: { qr_code: "<svg/>", secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://" } },
+        error: null,
+      })),
+      unenroll: vi.fn(async () => ({ data: {}, error: null })),
     },
   };
   const maybeSingle = vi.fn(async () =>
@@ -256,6 +282,64 @@ describe("server action signOut", () => {
   });
 });
 
+describe("thông báo lỗi mã TOTP", () => {
+  it.each([
+    [{ code: "mfa_verification_failed", status: 422 }, "Mã không đúng"],
+    [{ code: "mfa_challenge_expired", status: 422 }, "Mã đã hết hạn"],
+    [{ code: "mfa_factor_not_found", status: 404 }, "thiết lập lại"],
+    [{ code: "mfa_verification_rejected", status: 422 }, "quá nhiều lần"],
+    [{ code: "over_request_rate_limit", status: 429 }, "quá nhiều lần"],
+    [{ name: "AuthRetryableFetchError", status: 0 }, "Không kết nối được"],
+    [{ status: 503 }, "đang gặp sự cố"],
+    [{ code: "la_lam", status: 400 }, "Mã không đúng hoặc đã hết hạn"],
+  ])("%j", (error, message) => {
+    expect(totpErrorMessage(error)).toContain(message);
+  });
+});
+
+describe("thiết lập TOTP", () => {
+  const staff = { userId: "u1", email: "a@lw.test", role: "admin", aal: "aal1", mfaRequired: false } as const;
+
+  it("tạo QR với tên ứng dụng 'Language World Admin', dọn khóa dang dở trước", async () => {
+    vi.mocked(getSession).mockResolvedValue(staff);
+    const auth = fakeSupabase({ factors: [{ id: "old", factor_type: "totp", status: "unverified" }] });
+    const result = await startTotpEnroll();
+    expect(auth.mfa.unenroll).toHaveBeenCalledWith({ factorId: "old" });
+    expect(auth.mfa.enroll).toHaveBeenCalledWith(
+      expect.objectContaining({ factorType: "totp", issuer: "Language World Admin" }),
+    );
+    expect(result).toMatchObject({ factorId: "f-new", secret: "JBSWY3DPEHPK3PXP" });
+    expect((result as { qrCode: string }).qrCode).toMatch(/^data:image\/svg\+xml/);
+  });
+
+  it("đã có khóa đã xác minh thì không tạo thêm", async () => {
+    vi.mocked(getSession).mockResolvedValue(staff);
+    const auth = fakeSupabase();
+    expect(await startTotpEnroll()).toEqual({ error: "Tài khoản đã thiết lập xác thực hai lớp" });
+    expect(auth.mfa.enroll).not.toHaveBeenCalled();
+  });
+
+  it("người chơi / chưa đăng nhập không tạo được", async () => {
+    for (const session of [null, { ...staff, role: "player" as const }]) {
+      vi.mocked(getSession).mockResolvedValue(session);
+      const auth = fakeSupabase({ factors: [] });
+      expect(await startTotpEnroll()).toHaveProperty("error");
+      expect(auth.mfa.enroll).not.toHaveBeenCalled();
+    }
+  });
+
+  it("hủy thiết lập: chỉ xóa khóa CHƯA xác minh của chính mình", async () => {
+    vi.mocked(getSession).mockResolvedValue(staff);
+    let auth = fakeSupabase({ factors: [{ id: "dang-do", factor_type: "totp", status: "unverified" }] });
+    expect(await cancelTotpEnroll("dang-do")).toEqual({ ok: true });
+    expect(auth.mfa.unenroll).toHaveBeenCalledWith({ factorId: "dang-do" });
+    auth = fakeSupabase();
+    expect(await cancelTotpEnroll("f1")).toEqual({ ok: false });
+    expect(await cancelTotpEnroll("cua-nguoi-khac")).toEqual({ ok: false });
+    expect(auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+});
+
 describe("server action verifyTotp", () => {
   const staff = { userId: "u1", email: "a@lw.test", role: "admin", aal: "aal1", mfaRequired: true } as const;
 
@@ -280,6 +364,10 @@ describe("server action verifyTotp", () => {
     expect(await verifyTotp({}, form({ code: "000000" }))).toEqual({
       error: "Mã không đúng hoặc đã hết hạn",
     });
+    fakeSupabase({ verifyError: { code: "mfa_challenge_expired", status: 422 } });
+    expect((await verifyTotp({}, form({ code: "000000" }))).error).toContain("Mã đã hết hạn");
+    fakeSupabase({ verifyError: { code: "mfa_verification_failed", status: 422 } });
+    expect((await verifyTotp({}, form({ code: "000000" }))).error).toContain("Mã không đúng.");
     expect(redirect).not.toHaveBeenCalled();
   });
 

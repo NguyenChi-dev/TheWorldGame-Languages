@@ -115,6 +115,13 @@ export const ADMIN_SECTIONS = {
     group: "operations",
     roles: PERMISSIONS["logs.read"],
   },
+  settings: {
+    key: "settings",
+    href: "/settings",
+    label: "Cài đặt bảo mật",
+    group: "operations",
+    roles: PERMISSIONS["settings.manage"],
+  },
 } as const satisfies Record<string, AdminSection>;
 
 export type AdminSectionKey = keyof typeof ADMIN_SECTIONS;

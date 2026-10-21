@@ -83,5 +83,25 @@ export function signInErrorMessage(error: { code?: string; status?: number; name
   return "Email hoặc mật khẩu không đúng";
 }
 
+/** Lỗi khi xác minh mã TOTP → thông báo tiếng Việt. */
+export function totpErrorMessage(error: { code?: string; status?: number; name?: string }): string {
+  if (error.name === "AuthRetryableFetchError" || error.status === 0)
+    return "Không kết nối được máy chủ xác thực. Kiểm tra mạng rồi thử lại.";
+  switch (error.code) {
+    case "mfa_verification_failed":
+    case "invalid_credentials":
+      return "Mã không đúng. Kiểm tra giờ trên điện thoại đã tự động đồng bộ chưa, rồi nhập mã đang hiện.";
+    case "mfa_challenge_expired":
+      return "Mã đã hết hạn (mỗi mã chỉ dùng trong 30 giây). Nhập mã mới đang hiện trong ứng dụng.";
+    case "mfa_factor_not_found":
+      return "Không tìm thấy thiết bị xác thực. Tải lại trang để thiết lập lại.";
+    case "mfa_verification_rejected":
+    case "over_request_rate_limit":
+      return "Nhập sai quá nhiều lần. Hãy đợi vài phút rồi thử lại.";
+  }
+  if ((error.status ?? 0) >= 500) return "Hệ thống xác thực đang gặp sự cố, thử lại sau ít phút.";
+  return "Mã không đúng hoặc đã hết hạn";
+}
+
 export const SIGN_IN_FIELDS = ["email", "password"] as const;
 export const SIGN_UP_FIELDS = ["email", "username", "password", "confirmPassword"] as const;

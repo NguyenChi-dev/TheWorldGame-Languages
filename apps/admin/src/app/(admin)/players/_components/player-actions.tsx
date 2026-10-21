@@ -6,6 +6,7 @@ import {
   faEnvelopeCircleCheck,
   faKey,
   faLockOpen,
+  faMobileScreen,
   faPen,
   faTrashCan,
   faUserShield,
@@ -24,11 +25,12 @@ import {
   confirmPlayerEmail,
   deletePlayer,
   renamePlayer,
+  resetStaffMfa,
   sendPlayerPasswordReset,
   unbanPlayer,
 } from "../actions";
 
-type DialogKind = "rename" | "role" | "ban" | "unban" | "delete" | null;
+type DialogKind = "rename" | "role" | "ban" | "unban" | "delete" | "mfa" | null;
 
 const BAN_DURATIONS: { value: string; label: string }[] = [
   { value: "1", label: "1 ngày" },
@@ -175,6 +177,14 @@ export function PlayerActions({ player, isSelf }: { player: AdminPlayer; isSelf:
           />
           <MenuItem icon={faPen} label="Đổi tên nhân vật" onClick={() => openDialog("rename")} />
           <MenuItem icon={faUserShield} label="Đổi vai trò" onClick={() => openDialog("role")} />
+          {player.mfaEnabled ? (
+            <MenuItem
+              icon={faMobileScreen}
+              label="Đặt lại xác thực hai lớp"
+              hint="Khi nhân viên mất / đổi điện thoại: xóa thiết bị cũ, lần đăng nhập tới quét mã QR mới"
+              onClick={() => openDialog("mfa")}
+            />
+          ) : null}
           <div className="my-1 h-px bg-secondary" />
           {player.status === "banned" ? (
             <MenuItem icon={faLockOpen} label="Mở khóa tài khoản" onClick={() => openDialog("unban")} />
@@ -213,6 +223,15 @@ export function PlayerActions({ player, isSelf }: { player: AdminPlayer; isSelf:
           pending={pending}
           onClose={() => setDialog(null)}
           onConfirm={(reason) => run(() => unbanPlayer(player.id, { reason }))}
+        />
+      ) : null}
+      {dialog === "mfa" ? (
+        <ReasonDialog
+          title={`Đặt lại xác thực hai lớp cho ${name}?`}
+          confirmLabel="Đặt lại"
+          pending={pending}
+          onClose={() => setDialog(null)}
+          onConfirm={(reason) => run(() => resetStaffMfa(player.id, { reason }))}
         />
       ) : null}
       {dialog === "delete" ? (

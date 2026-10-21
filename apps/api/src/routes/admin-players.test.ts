@@ -7,7 +7,15 @@ const EDITOR = { sub: "a0000000-0000-4000-8000-000000000003", email: "editor@lw.
 const P1 = "b0000000-0000-4000-8000-000000000001"; // người chơi, đã xác nhận
 const P2 = "b0000000-0000-4000-8000-000000000002"; // người chơi, chưa xác nhận
 const P3 = "b0000000-0000-4000-8000-000000000003"; // người chơi, đang bị khóa
-const TOKENS: Record<string, typeof ADMIN> = { "tk-admin": ADMIN, "tk-mod": MOD, "tk-editor": EDITOR };
+/** "tk-admin-aal1": admin mới nhập mật khẩu, chưa qua xác thực hai lớp. */
+const TOKENS: Record<string, typeof ADMIN & { aal?: string }> = {
+  "tk-admin": ADMIN,
+  "tk-admin-aal1": { ...ADMIN, aal: "aal1" },
+  "tk-mod": MOD,
+  "tk-editor": EDITOR,
+};
+/** Công tắc admin_settings.require_mfa của database giả. */
+const mfaSwitch = vi.hoisted(() => ({ on: true }));
 
 /** "Database" giả, đặt lại trước mỗi test. */
 const db = vi.hoisted(() => ({
@@ -26,7 +34,14 @@ vi.mock("../lib/supabase", () => {
           const user = TOKENS[token];
           return user
             ? {
-                data: { claims: { sub: user.sub, email: user.email, role: "authenticated", aal: "aal2" } },
+                data: {
+                  claims: {
+                    sub: user.sub,
+                    email: user.email,
+                    role: "authenticated",
+                    aal: user.aal ?? "aal2",
+                  },
+                },
                 error: null,
               }
             : { data: null, error: new Error("invalid JWT") };
@@ -41,7 +56,8 @@ vi.mock("../lib/supabase", () => {
         },
         admin: {
           listUsers: async ({ page }: { page: number }) => ({
-            data: { users: page === 1 ? db.users : [] },
+            // Giống Supabase thật: danh sách người dùng không kèm factors.
+            data: { users: page === 1 ? db.users.map((user) => ({ ...user, factors: undefined })) : [] },
             error: null,
           }),
           getUserById: async (id: string) =>
@@ -61,6 +77,18 @@ vi.mock("../lib/supabase", () => {
             db.users = db.users.filter((u) => u.id !== id);
             return { data: {}, error: null };
           },
+          mfa: {
+            listFactors: async ({ userId }: { userId: string }) => ({
+              data: { factors: (userById(userId)?.factors as unknown[]) ?? [] },
+              error: null,
+            }),
+            deleteFactor: async ({ id, userId }: { id: string; userId: string }) => {
+              db.calls.push({ fn: "deleteFactor", args: [id, userId] });
+              const user = userById(userId)!;
+              user.factors = (user.factors as { id: string }[]).filter((f) => f.id !== id);
+              return { data: { id }, error: null };
+            },
+          },
         },
       },
       from: (table: string) => {
@@ -77,7 +105,7 @@ vi.mock("../lib/supabase", () => {
               error: null,
             }),
           }),
-          maybeSingle: async () => ({ data: { require_mfa: true }, error: null }),
+          maybeSingle: async () => ({ data: { require_mfa: mfaSwitch.on }, error: null }),
           update: (values: { username: string }) => ({
             eq: async (_col: string, id: string) => {
               if (values.username === "Trùng_Tên") return { error: { code: "23505", message: "duplicate" } };
@@ -210,6 +238,91 @@ describe("Nhóm tài khoản (group)", () => {
 
   it("group lạ: 400", async () => {
     expect((await app.request("/admin/players?group=khach", as("tk-admin"))).status).toBe(400);
+  });
+});
+
+describe("Xác thực bổ sung (AAL2) cho thao tác nhạy cảm", () => {
+  it("công tắc 2 lớp bật: admin aal1 bị chặn cả xem lẫn thao tác", async () => {
+    mfaSwitch.on = true;
+    expect((await app.request("/admin/players", as("tk-admin-aal1"))).status).toBe(403);
+  });
+
+  it("công tắc 2 lớp tắt: admin aal1 xem được, nhưng thao tác nhạy cảm vẫn cần AAL2", async () => {
+    mfaSwitch.on = false;
+    try {
+      expect((await app.request("/admin/players", as("tk-admin-aal1"))).status).toBe(200);
+      const res = await post("tk-admin-aal1", `/admin/players/${P2}/confirm-email`);
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        error: "Cần xác thực hai lớp (TOTP) trước khi dùng chức năng quản trị",
+      });
+      expect(db.calls).toEqual([]);
+      expect(db.logs).toEqual([]);
+      expect((await post("tk-admin", `/admin/players/${P2}/confirm-email`)).status).toBe(200);
+    } finally {
+      mfaSwitch.on = true;
+    }
+  });
+});
+
+describe("Đặt lại xác thực hai lớp của nhân viên (POST /:id/mfa-reset)", () => {
+  const withFactor = () => {
+    const mod = db.users.find((u) => u.id === MOD.sub)!;
+    mod.factors = [{ id: "fac-1", factor_type: "totp", status: "verified" }];
+  };
+
+  it("admin AAL2: xóa mọi khóa TOTP, trả mfaEnabled=false, ghi nhật ký kèm lý do", async () => {
+    withFactor();
+    const before = await app.request(`/admin/players/${MOD.sub}`, as("tk-admin"));
+    expect(((await before.json()) as { mfaEnabled: boolean }).mfaEnabled).toBe(true);
+    const res = await post("tk-admin", `/admin/players/${MOD.sub}/mfa-reset`, { reason: "Mất điện thoại" });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { player: unknown }).player).toMatchObject({
+      id: MOD.sub,
+      mfaEnabled: false,
+    });
+    expect(db.calls).toEqual([{ fn: "deleteFactor", args: ["fac-1", MOD.sub] }]);
+    expect(db.logs).toEqual([
+      expect.objectContaining({
+        actor_id: ADMIN.sub,
+        action: "auth.mfa_reset",
+        target_id: MOD.sub,
+        reason: "Mất điện thoại",
+      }),
+    ]);
+  });
+
+  it("danh sách nhân viên cho biết ai đã thiết lập 2 lớp (Admin API không trả factors trong danh sách)", async () => {
+    withFactor();
+    const res = await app.request("/admin/players?group=staff", as("tk-admin"));
+    const body = (await res.json()) as { players: { id: string; mfaEnabled: boolean }[] };
+    expect(body.players.find((p) => p.id === MOD.sub)?.mfaEnabled).toBe(true);
+    expect(body.players.find((p) => p.id === ADMIN.sub)?.mfaEnabled).toBe(false);
+  });
+
+  it("bắt buộc lý do; chưa thiết lập thì báo 409", async () => {
+    expect((await post("tk-admin", `/admin/players/${MOD.sub}/mfa-reset`, {})).status).toBe(400);
+    expect((await post("tk-admin", `/admin/players/${MOD.sub}/mfa-reset`, { reason: "x" })).status).toBe(409);
+  });
+
+  it("không tự đặt lại cho mình; moderator / editor / admin aal1 bị chặn", async () => {
+    withFactor();
+    expect((await post("tk-admin", `/admin/players/${ADMIN.sub}/mfa-reset`, { reason: "x" })).status).toBe(
+      403,
+    );
+    expect((await post("tk-mod", `/admin/players/${MOD.sub}/mfa-reset`, { reason: "x" })).status).toBe(403);
+    expect((await post("tk-editor", `/admin/players/${MOD.sub}/mfa-reset`, { reason: "x" })).status).toBe(
+      403,
+    );
+    mfaSwitch.on = false;
+    try {
+      expect(
+        (await post("tk-admin-aal1", `/admin/players/${MOD.sub}/mfa-reset`, { reason: "x" })).status,
+      ).toBe(403);
+    } finally {
+      mfaSwitch.on = true;
+    }
+    expect(db.calls).toEqual([]);
   });
 });
 

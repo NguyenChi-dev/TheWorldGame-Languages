@@ -19,6 +19,9 @@ import {
   ADMIN_SECTIONS,
   isRole,
   isStaffRole,
+  requiresAal2,
+  rolesFor,
+  type Permission,
   type AdminSectionKey,
   type Role,
   type StaffRole,
@@ -58,15 +61,19 @@ export function isSignInComplete(session: Session): boolean {
  * - unauthenticated: chưa đăng nhập / phiên hết hạn / bị thu hồi / cookie bị sửa → đăng nhập lại.
  * - forbidden: đã đăng nhập nhưng không đủ quyền (KHÔNG phải phiên hết hạn).
  * - mfa_required: thiếu xác thực hai lớp.
+ * - step_up_required: thao tác nhạy cảm (AAL2_PERMISSIONS) mà phiên chưa qua 2 lớp, kể cả khi công tắc tắt.
  * - unavailable: không hỏi được Supabase Auth (mất mạng / máy chủ lỗi). Không xóa phiên, cho thử lại.
  */
-export type AuthErrorCode = "unauthenticated" | "forbidden" | "mfa_required" | "unavailable";
+export type AuthErrorCode =
+  "unauthenticated" | "forbidden" | "mfa_required" | "step_up_required" | "unavailable";
 
 const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
   unauthenticated: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.",
   unavailable: "Không kết nối được máy chủ xác thực. Kiểm tra mạng rồi thử lại.",
   forbidden: "Bạn không có quyền làm việc này",
   mfa_required: "Cần xác thực hai lớp trước khi vào trang quản trị",
+  step_up_required:
+    "Thao tác này cần xác thực hai lớp. Bấm “Xác thực hai lớp” ở thanh bên để nhập mã từ ứng dụng trên điện thoại.",
 };
 
 export class AuthError extends Error {
@@ -135,6 +142,17 @@ export async function requireRole(roles: readonly Role[]): Promise<StaffSession>
   if (!isStaffRole(session.role) || !roles.includes(session.role)) throw new AuthError("forbidden");
   if (!isSignInComplete(session)) throw new AuthError("mfa_required");
   return { ...session, role: session.role };
+}
+
+/**
+ * Kiểm tra theo thao tác trong ma trận PERMISSIONS (@lw/shared): đúng vai trò (như requireRole) VÀ, với
+ * thao tác nhạy cảm (AAL2_PERMISSIONS: đổi vai trò, quản lý tài khoản người chơi, xóa nội dung), phiên phải
+ * là AAL2 ngay cả khi công tắc 2 lớp đang tắt.
+ */
+export async function requirePermission(permission: Permission): Promise<StaffSession> {
+  const session = await requireRole(rolesFor(permission));
+  if (requiresAal2(permission) && session.aal !== "aal2") throw new AuthError("step_up_required");
+  return session;
 }
 
 /**

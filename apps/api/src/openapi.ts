@@ -129,6 +129,18 @@ const PLAYER_ROUTES: RouteDoc[] = [
     extraErrors: { ...NOT_FOUND, 409: "Tài khoản không bị khóa" },
   },
   {
+    method: "post",
+    path: "/admin/players/{id}/mfa-reset",
+    tag: TAGS.players,
+    summary: "Đặt lại xác thực hai lớp (mất điện thoại)",
+    accessNote: `${ADMIN_ONLY} Luôn cần token đã qua xác thực hai lớp (aal2). Xóa mọi khóa TOTP của tài khoản.`,
+    access: "staff",
+    params: AdminPlayerParams,
+    body: AdminReasonRequest,
+    response: AdminPlayerActionResponse,
+    extraErrors: { ...NOT_FOUND, 409: "Tài khoản chưa thiết lập xác thực hai lớp" },
+  },
+  {
     method: "patch",
     path: "/admin/players/{id}",
     tag: TAGS.players,

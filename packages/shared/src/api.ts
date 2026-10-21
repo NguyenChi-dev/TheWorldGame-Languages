@@ -141,6 +141,8 @@ export const AdminPlayer = z.object({
   emailConfirmedAt: z.string().nullable(),
   /** Khóa tới lúc nào (null = không bị khóa). */
   bannedUntil: z.string().nullable(),
+  /** Đã thiết lập xác thực hai lớp (có khóa TOTP đã xác minh). */
+  mfaEnabled: z.boolean(),
 });
 export type AdminPlayer = z.infer<typeof AdminPlayer>;
 

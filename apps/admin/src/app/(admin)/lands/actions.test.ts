@@ -23,10 +23,18 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAction: vi.fn() }));
-vi.mock("@/lib/auth", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/auth")>()),
-  requireRole: vi.fn(),
-}));
+vi.mock("@/lib/auth", async (importOriginal) => {
+  const { rolesFor } = await import("@lw/shared");
+  const requireRole = vi.fn();
+  return {
+    ...(await importOriginal<typeof import("@/lib/auth")>()),
+    requireRole,
+    // Cùng vai trò như requireRole thật; bước AAL2 của requirePermission có test riêng ở lib/auth.test.ts.
+    requirePermission: vi.fn((permission: Parameters<typeof rolesFor>[0]) =>
+      requireRole(rolesFor(permission)),
+    ),
+  };
+});
 
 const LAND = "a17d0000-0000-4000-8000-000000000001";
 const LAND_2 = "a17d0000-0000-4000-8000-000000000002";

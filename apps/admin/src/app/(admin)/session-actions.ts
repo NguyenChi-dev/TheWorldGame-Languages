@@ -18,6 +18,7 @@ export async function checkSession(): Promise<SessionStatus> {
     return { state: "ok", userId: session.userId, role: session.role };
   } catch (error) {
     if (!(error instanceof AuthError)) throw error;
-    return { state: error.code === "unauthenticated" ? "signed_out" : error.code };
+    if (error.code === "unauthenticated") return { state: "signed_out" };
+    return { state: error.code === "step_up_required" ? "mfa_required" : error.code };
   }
 }

@@ -18,6 +18,7 @@ import {
   fieldErrors,
   parseForm,
   signInErrorMessage,
+  totpErrorMessage,
 } from "@/lib/auth-schemas";
 import { safeNextPath, withNext } from "@/lib/safe-next";
 import { isAuthCookie } from "@/lib/supabase/cookie";
@@ -150,7 +151,12 @@ export async function startTotpEnroll(): Promise<EnrollResult> {
     }
   }
 
-  const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
+  // issuer + friendlyName: ứng dụng xác thực hiện "Language World Admin (email)" thay vì địa chỉ dự án Supabase.
+  const { data, error } = await supabase.auth.mfa.enroll({
+    factorType: "totp",
+    issuer: "Language World Admin",
+    friendlyName: `Admin ${session.email ?? session.userId}`.slice(0, 60),
+  });
   if (error) return { error: "Không tạo được mã QR, thử lại sau" };
 
   const qr = data.totp.qr_code;
@@ -162,6 +168,19 @@ export async function startTotpEnroll(): Promise<EnrollResult> {
 }
 
 /** Xác minh mã 6 số. Có `factorId` trong form = đang thiết lập lần đầu; không có = dùng khóa đã có. */
+/** Đổi ý giữa chừng (quét nhầm, muốn tạo mã QR mới): xóa khóa TOTP CHƯA xác minh của chính mình. */
+export async function cancelTotpEnroll(factorId: string): Promise<{ ok: boolean }> {
+  const session = await getSession();
+  if (!session || !isStaffRole(session.role)) return { ok: false };
+  const supabase = await createClient();
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const factor = factors?.all.find((item) => item.id === factorId);
+  // Chỉ khóa đang dang dở: khóa đã xác minh không xóa được từ đây (cần admin đặt lại).
+  if (!factor || factor.status !== "unverified") return { ok: false };
+  const { error } = await supabase.auth.mfa.unenroll({ factorId });
+  return { ok: !error };
+}
+
 export async function verifyTotp(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const session = await getSession();
   if (!session || !isStaffRole(session.role)) return { error: PLAYER_BLOCKED };
@@ -177,8 +196,24 @@ export async function verifyTotp(_prev: ActionState, formData: FormData): Promis
   }
   if (!factorId) return { error: "Tài khoản chưa thiết lập xác thực hai lớp" };
 
-  const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
-  if (error) return { error: "Mã không đúng hoặc đã hết hạn" };
+  const { error } = await supabase.auth.mfa
+    .challengeAndVerify({ factorId, code })
+    .catch(() => ({ error: { name: "AuthRetryableFetchError", status: 0 } }));
+  if (error) return { error: totpErrorMessage(error) };
+
+  // Lần đầu thiết lập xong (có factorId trong form): ghi nhật ký. Client vừa nhận phiên AAL2 mới nên
+  // RLS của admin_logs nhận. Lỗi ghi nhật ký không chặn đăng nhập (chỉ ghi log máy chủ).
+  if (formData.get("factorId")) {
+    const { error: logError } = await supabase.from("admin_logs").insert({
+      actor_id: session.userId,
+      actor_role: session.role,
+      action: "auth.mfa_enrolled",
+      target_table: "auth.mfa_factors",
+      target_id: factorId,
+      after: { factor_type: "totp", status: "verified" },
+    });
+    if (logError) console.error("[verifyTotp] Không ghi được nhật ký thiết lập 2 lớp:", logError.message);
+  }
 
   redirect(safeNextPath(formData.get("next")));
 }

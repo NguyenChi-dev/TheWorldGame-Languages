@@ -6,7 +6,7 @@ import { Alert, ShineButtonContent, SubmitButton } from "@/components/auth/form"
 import { ArrowRightIcon, CheckIcon, CopyIcon, PhoneIcon, ShieldIcon } from "@/components/icons";
 import { inputClass, primaryButtonClass } from "@/components/auth/styles";
 import type { ActionState } from "@/lib/action-state";
-import { startTotpEnroll, verifyTotp, type EnrollResult } from "../../actions";
+import { cancelTotpEnroll, startTotpEnroll, verifyTotp, type EnrollResult } from "../../actions";
 
 function CodeForm({ factorId }: { factorId?: string }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(verifyTotp, {});
@@ -149,6 +149,19 @@ export function TotpEnrollForm() {
             </div>
           </div>
           <CodeForm factorId={ready.factorId} />
+          <button
+            type="button"
+            disabled={pending}
+            className="mx-auto block text-xs font-semibold text-slate-500 underline-offset-4 hover:text-accent hover:underline"
+            onClick={() =>
+              startTransition(async () => {
+                await cancelTotpEnroll(ready.factorId);
+                setEnroll(await startTotpEnroll());
+              })
+            }
+          >
+            Không quét được? Tạo mã QR mới
+          </button>
         </div>
       ) : (
         <div className="space-y-4 short:space-y-3">

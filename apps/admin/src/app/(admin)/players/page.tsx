@@ -295,6 +295,22 @@ export default async function PlayersPage({ searchParams }: { searchParams: Sear
                         >
                           {PLAYER_STATUS_LABELS[player.status]}
                         </span>
+                        {isStaffTab ? (
+                          <span
+                            className={`ml-1.5 inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${
+                              player.mfaEnabled
+                                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                                : "bg-amber-50 text-amber-700 ring-amber-200"
+                            }`}
+                            title={
+                              player.mfaEnabled
+                                ? "Đã thiết lập xác thực hai lớp"
+                                : "Chưa thiết lập xác thực hai lớp: không làm được thao tác nhạy cảm"
+                            }
+                          >
+                            {player.mfaEnabled ? "2 lớp ✓" : "Chưa 2 lớp"}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="whitespace-nowrap py-2.5 pr-3 text-xs text-slate-500">
                         {formatTime(player.createdAt)}

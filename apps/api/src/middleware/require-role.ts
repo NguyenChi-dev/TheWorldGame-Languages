@@ -21,7 +21,11 @@ import type { AuthEnv } from "./auth.js";
 /** Kiểu "môi trường" của Hono cho route đã qua requireRole. */
 export type StaffEnv = AuthEnv & { Variables: { role: StaffRole } };
 
-export function requireRole(roles: readonly Role[]) {
+/**
+ * `options.aal2`: thao tác nhạy cảm (AAL2_PERMISSIONS trong @lw/shared) — luôn cần token AAL2,
+ * kể cả khi công tắc require_mfa đang tắt (xác thực bổ sung).
+ */
+export function requireRole(roles: readonly Role[], options: { aal2?: boolean } = {}) {
   return createMiddleware<StaffEnv>(async (c, next) => {
     const user = c.get("user");
     if (!user) throw new ApiError(401, Messages.unauthenticated);
@@ -52,7 +56,7 @@ export function requireRole(roles: readonly Role[]) {
     const role = isRole(data?.role) ? data.role : "player";
     if (!isStaffRole(role) || !roles.includes(role)) throw new ApiError(403, Messages.forbiddenAdmin);
     const mfaRequired = settings.error ? true : settings.data?.require_mfa !== false;
-    if (mfaRequired && user.aal !== "aal2") throw new ApiError(403, Messages.mfaRequired);
+    if ((mfaRequired || options.aal2) && user.aal !== "aal2") throw new ApiError(403, Messages.mfaRequired);
 
     c.set("role", role);
     await next();

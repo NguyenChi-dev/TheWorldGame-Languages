@@ -40,15 +40,33 @@ export const PERMISSIONS = {
   "players.manage": ["admin"],
 
   // Nhân viên và hệ thống.
-  /** Đổi vai trò (cấp / thu hồi quyền nhân viên). */
+  /** Đổi vai trò (cấp / thu hồi quyền nhân viên), đặt lại xác thực hai lớp của nhân viên khác. */
   "staff.manage": ["admin"],
   "logs.read": ["admin"],
   /** Ghi nhật ký cho thao tác của chính mình (luôn kèm thao tác ghi). */
   "logs.write": ["admin", "editor", "moderator"],
   "economy.manage": ["admin"],
+  /** Cài đặt bảo mật: công tắc bắt buộc xác thực hai lớp cho mọi nhân viên. */
+  "settings.manage": ["admin"],
 } as const satisfies Record<string, readonly StaffRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;
+
+/**
+ * Thao tác nhạy cảm (không hoàn tác được hoặc đụng tới tài khoản người khác): LUÔN cần phiên đã qua
+ * xác thực hai lớp (AAL2), kể cả khi công tắc admin_settings.require_mfa đang tắt ("xác thực bổ sung").
+ * Admin web (requirePermission) và apps/api (requireRole với aal2) cùng áp dụng.
+ */
+export const AAL2_PERMISSIONS = [
+  "staff.manage",
+  "players.manage",
+  "content.delete",
+  "settings.manage",
+] as const satisfies readonly Permission[];
+
+export function requiresAal2(permission: Permission): boolean {
+  return (AAL2_PERMISSIONS as readonly Permission[]).includes(permission);
+}
 
 /** Vai trò `role` có quyền `permission` không. Thiếu vai trò / vai trò lạ → false. */
 export function can(role: Role | null | undefined, permission: Permission): boolean {

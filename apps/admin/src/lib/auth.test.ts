@@ -3,7 +3,7 @@ import { STAFF_ROLES, sectionsForRole, type Role } from "@lw/shared";
 import { createClient } from "@/lib/supabase/server";
 import { fakeSupabase, type FakeUser } from "@/test/fake-supabase";
 import { logAction } from "./audit";
-import { AuthError, requireRole, requireSection } from "./auth";
+import { AuthError, requirePermission, requireRole, requireSection } from "./auth";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
@@ -116,6 +116,33 @@ describe("requireRole", () => {
   });
 });
 
+describe("requirePermission (xác thực bổ sung AAL2)", () => {
+  it.each(["staff.manage", "players.manage", "content.delete"] as const)(
+    "%s: công tắc 2 lớp tắt, admin aal1 vẫn bị yêu cầu xác thực hai lớp",
+    async (permission) => {
+      loginAs({ role: "admin", aal: "aal1", mfaRequired: false });
+      expect(await authErrorCode(requirePermission(permission))).toBe("step_up_required");
+    },
+  );
+
+  it("thao tác thường không cần xác thực bổ sung khi công tắc tắt", async () => {
+    loginAs({ role: "editor", aal: "aal1", mfaRequired: false });
+    await expect(requirePermission("content.update")).resolves.toMatchObject({ role: "editor" });
+  });
+
+  it("phiên AAL2 làm được thao tác nhạy cảm; sai vai trò vẫn bị chặn trước", async () => {
+    loginAs({ role: "admin", aal: "aal2" });
+    await expect(requirePermission("staff.manage")).resolves.toMatchObject({ role: "admin" });
+    loginAs({ role: "editor", aal: "aal2" });
+    expect(await authErrorCode(requirePermission("content.delete"))).toBe("forbidden");
+  });
+
+  it("công tắc bật: aal1 bị chặn ngay ở bước đăng nhập (mfa_required)", async () => {
+    loginAs({ role: "admin", aal: "aal1", mfaRequired: true });
+    expect(await authErrorCode(requirePermission("staff.manage"))).toBe("mfa_required");
+  });
+});
+
 describe("requireSection", () => {
   it("chuyển hướng đúng nơi theo lý do bị chặn", async () => {
     loginAs(null);
@@ -147,7 +174,7 @@ describe("requireSection", () => {
 
 describe("bảng phân quyền menu", () => {
   it.each<[Role, string[]]>([
-    ["admin", ["/", "/lands", "/words", "/media", "/economy", "/players", "/logs"]],
+    ["admin", ["/", "/lands", "/words", "/media", "/economy", "/players", "/logs", "/settings"]],
     ["editor", ["/", "/lands", "/words", "/media"]],
     ["moderator", ["/", "/players"]],
     ["player", []],
@@ -164,6 +191,7 @@ describe("bảng phân quyền menu", () => {
       ["Vật phẩm và kinh tế", "economy"],
       ["Người chơi và báo cáo", "operations"],
       ["Nhật ký", "operations"],
+      ["Cài đặt bảo mật", "operations"],
     ]);
   });
 });

@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isRole, rolesFor } from "@lw/shared";
+import { isRole, type Permission } from "@lw/shared";
 import type { AdminPlayerActionResponse } from "@lw/shared/api";
 import type { ActionResult, ActionState } from "@/lib/action-state";
 import { ApiCallError, apiRequest } from "@/lib/api";
 import { logAction } from "@/lib/audit";
-import { AuthError, requireRole } from "@/lib/auth";
+import { AuthError, requirePermission } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -15,7 +15,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function changeUserRole(_prev: ActionState, formData: FormData): Promise<ActionState> {
   let session;
   try {
-    session = await requireRole(rolesFor("staff.manage"));
+    session = await requirePermission("staff.manage");
   } catch (error) {
     if (error instanceof AuthError) return { error: error.message };
     throw error;
@@ -67,10 +67,10 @@ export async function changeUserRole(_prev: ActionState, formData: FormData): Pr
 // gọi qua apps/api (/admin/players/...). apps/api kiểm tra lại token, vai trò admin, và ghi nhật ký.
 // =============================================================================
 
-/** Lớp 2: chỉ admin. Trả thông báo lỗi thay vì ném lỗi ra giao diện. */
-async function adminGuard(id: string): Promise<string | null> {
+/** Lớp 2: chỉ admin (và AAL2). Trả thông báo lỗi thay vì ném lỗi ra giao diện. */
+async function adminGuard(id: string, permission: Permission = "players.manage"): Promise<string | null> {
   try {
-    await requireRole(rolesFor("players.manage"));
+    await requirePermission(permission);
   } catch (error) {
     if (error instanceof AuthError) return error.message;
     throw error;
@@ -83,8 +83,9 @@ async function callPlayerApi(
   path: string,
   method: "POST" | "PATCH" | "DELETE",
   body?: unknown,
+  permission: Permission = "players.manage",
 ): Promise<ActionResult> {
-  const denied = await adminGuard(id);
+  const denied = await adminGuard(id, permission);
   if (denied) return { ok: false, error: denied };
   try {
     const result = await apiRequest<AdminPlayerActionResponse>(`/admin/players/${id}${path}`, {
@@ -120,6 +121,11 @@ export async function unbanPlayer(id: string, input: { reason: string }) {
 
 export async function renamePlayer(id: string, input: { username: string }) {
   return callPlayerApi(id, "", "PATCH", input);
+}
+
+/** Đặt lại xác thực hai lớp của nhân viên khác (mất điện thoại). Bắt buộc lý do. */
+export async function resetStaffMfa(id: string, input: { reason: string }) {
+  return callPlayerApi(id, "/mfa-reset", "POST", input, "staff.manage");
 }
 
 /** Xóa vĩnh viễn. Bắt buộc lý do; giao diện bắt gõ lại email để xác nhận. */

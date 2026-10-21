@@ -47,6 +47,7 @@ export function toAdminPlayer(user: User, profile: ProfileRow | undefined, now =
     lastSignInAt: user.last_sign_in_at ?? null,
     emailConfirmedAt: user.email_confirmed_at ?? null,
     bannedUntil: status === "banned" ? (user.banned_until ?? null) : null,
+    mfaEnabled: (user.factors ?? []).some((f) => f.factor_type === "totp" && f.status === "verified"),
   };
 }
 
@@ -114,13 +115,32 @@ export async function listPlayers(
   );
   const start = (query.page - 1) * query.perPage;
   return {
-    players: filtered.slice(start, start + query.perPage),
+    players: await withStaffMfa(supabase, filtered.slice(start, start + query.perPage)),
     total: filtered.length,
     page: query.page,
     perPage: query.perPage,
     groups,
     stats,
   };
+}
+
+/**
+ * Danh sách người dùng của Admin API KHÔNG kèm thiết bị xác thực (factors), nên hỏi riêng cho các tài khoản
+ * nhân viên trong trang đang xem (ít, vài chục). Người chơi không dùng 2 lớp nên giữ mfaEnabled=false.
+ * Lỗi đọc thì giữ giá trị cũ (không làm hỏng cả danh sách).
+ */
+async function withStaffMfa(supabase: SupabaseClient, players: AdminPlayer[]): Promise<AdminPlayer[]> {
+  return Promise.all(
+    players.map(async (player) => {
+      if (player.role === "player") return player;
+      const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId: player.id });
+      if (error) return player;
+      return {
+        ...player,
+        mfaEnabled: (data?.factors ?? []).some((f) => f.factor_type === "totp" && f.status === "verified"),
+      };
+    }),
+  );
 }
 
 /** Một tài khoản theo id (404 nếu không có). */

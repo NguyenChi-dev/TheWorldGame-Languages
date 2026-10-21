@@ -32,6 +32,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
         email={session.email}
         roleLabel={ROLE_LABELS[session.role]}
         defaultCollapsed={collapsed}
+        needsMfa={session.aal !== "aal2"}
       />
       <main className="min-w-0 flex-1 p-4 md:p-6">
         {/* ToastProvider: thông báo thành công / lỗi (toast) cho mọi trang quản trị. */}

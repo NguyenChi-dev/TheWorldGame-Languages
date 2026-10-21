@@ -7,13 +7,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { PERMISSIONS, ROLES, can, rolesFor, type Permission } from "@lw/shared";
+import { PERMISSIONS, ROLES, can, requiresAal2, rolesFor, type Permission } from "@lw/shared";
 
 const MIGRATIONS = path.resolve(__dirname, "../../../../supabase/migrations");
 
 /** Policy hiện hành (migration sau ghi đè / xóa policy cùng tên của migration trước). */
 function currentPolicies() {
-  const policies = new Map<string, { table: string; command: string; roles: string[] | null }>();
+  const policies = new Map<
+    string,
+    { table: string; command: string; roles: string[] | null; aal2: boolean }
+  >();
   for (const file of fs
     .readdirSync(MIGRATIONS)
     .filter((name) => name.endsWith(".sql"))
@@ -35,6 +38,7 @@ function currentPolicies() {
         table: create[2],
         command: create[3].toLowerCase(),
         roles: roles[0]?.split(",").sort() ?? null,
+        aal2: /has_aal2()/.test(statement),
       });
     }
   }
@@ -73,6 +77,13 @@ describe("ma trận phân quyền khớp RLS", () => {
       const permission = RLS_TO_PERMISSION[key];
       expect(permission, `chưa ánh xạ policy ${key} vào PERMISSIONS`).toBeDefined();
       expect(policy.roles, `${key} ↔ ${permission}`).toEqual([...rolesFor(permission)].sort());
+    }
+  });
+
+  it("thao tác nhạy cảm (AAL2_PERMISSIONS) luôn đòi has_aal2() trong RLS, thao tác khác thì không", () => {
+    for (const policy of staffPolicies) {
+      const permission = RLS_TO_PERMISSION[`${policy.table}:${policy.command}`];
+      expect(policy.aal2, `${policy.table}:${policy.command} ↔ ${permission}`).toBe(requiresAal2(permission));
     }
   });
 
