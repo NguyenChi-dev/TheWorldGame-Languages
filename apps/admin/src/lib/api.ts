@@ -34,10 +34,10 @@ export async function apiRequest<T>(
   } = await supabase.auth.getSession();
   if (!session) throw new ApiCallError(401, "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại");
 
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}${path}`, {
-      method: options.method ?? "GET",
+  const method = options.method ?? "GET";
+  const send = () =>
+    fetch(`${API_URL}${path}`, {
+      method,
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
@@ -45,8 +45,26 @@ export async function apiRequest<T>(
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       cache: "no-store",
     });
+  let response: Response;
+  try {
+    response = await send();
   } catch {
-    throw new ApiCallError(503, `Không kết nối được máy chủ API (${API_URL}). Hãy chạy apps/api.`);
+    // Chỉ thử lại yêu cầu ĐỌC (GET) một lần sau lỗi mạng thoáng qua. Thao tác ghi không tự gửi lại để
+    // tránh làm 2 lần (ví dụ khóa / xóa tài khoản): người dùng tự bấm lại khi thấy lỗi.
+    if (method !== "GET") {
+      throw new ApiCallError(503, `Không kết nối được máy chủ API (${API_URL}). Thử lại sau giây lát.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    try {
+      response = await send();
+    } catch {
+      throw new ApiCallError(503, `Không kết nối được máy chủ API (${API_URL}). Hãy chạy apps/api.`);
+    }
+  }
+  // 502/503/504 với yêu cầu đọc: máy chủ đang khởi động lại / quá tải — thử lại một lần.
+  if (method === "GET" && [502, 503, 504].includes(response.status)) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    response = await send().catch(() => response);
   }
 
   const data: unknown = await response.json().catch(() => null);

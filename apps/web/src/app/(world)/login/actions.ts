@@ -60,6 +60,16 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
     }
     if (error.code === "over_request_rate_limit")
       return { values: { email }, error: "Thử quá nhiều lần, chờ ít phút rồi đăng nhập lại" };
+    // Supabase chỉ báo "bị khóa" khi mật khẩu đúng, nên không lộ thêm thông tin cho người đoán mò.
+    if (error.code === "user_banned")
+      return {
+        values: { email },
+        error: "Tài khoản đã bị khóa. Nếu cho rằng đây là nhầm lẫn, hãy liên hệ quản trị viên.",
+      };
+    if (error.name === "AuthRetryableFetchError" || error.status === 0)
+      return { values: { email }, error: "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại." };
+    if ((error.status ?? 0) >= 500)
+      return { values: { email }, error: "Hệ thống đăng nhập đang gặp sự cố, thử lại sau ít phút." };
     return { values: { email }, error: "Email hoặc mật khẩu không đúng" };
   }
   redirect("/play");

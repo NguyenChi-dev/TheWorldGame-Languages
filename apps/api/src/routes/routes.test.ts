@@ -283,6 +283,16 @@ describe("Phiên bị thu hồi / tài khoản bị khóa (JWT vẫn đúng ch�
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn" });
   });
+
+  it("route của người chơi (/me) cũng trả 401: người chơi bị khóa không sửa được hồ sơ", async () => {
+    expect((await app.request("/me", asUser(REVOKED_ADMIN_TOKEN))).status).toBe(401);
+    const res = await app.request("/me", {
+      ...asUser(REVOKED_ADMIN_TOKEN),
+      method: "PATCH",
+      body: JSON.stringify({ username: "Mèo_Mới!" }),
+    });
+    expect(res.status).toBe(401);
+  });
 });
 
 describe("GET /admin/me", () => {

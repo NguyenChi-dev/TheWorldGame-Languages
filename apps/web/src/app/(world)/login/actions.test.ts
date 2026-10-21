@@ -18,7 +18,7 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 
-type AuthError = { code: string } | null;
+type AuthError = { code?: string; status?: number; name?: string } | null;
 
 /** Supabase giả: mỗi hàm trả về kết quả cấu hình sẵn, ghi lại tham số được gọi. */
 function fakeSupabase(
@@ -88,6 +88,17 @@ describe("đăng nhập", () => {
       error: "Email hoặc mật khẩu không đúng",
     });
     expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ code: "user_banned", status: 400 }, "Tài khoản đã bị khóa"],
+    [{ name: "AuthRetryableFetchError", status: 0 }, "Không kết nối được máy chủ"],
+    [{ status: 503 }, "đang gặp sự cố"],
+  ])("lỗi %j: thông báo dễ hiểu", async (signInError, message) => {
+    fakeSupabase({ signInError });
+    expect((await signIn({}, form({ email: "an@lw.test", password: "matkhau-dai" }))).error).toContain(
+      message,
+    );
   });
 
   it("chưa xác nhận email: trả code để giao diện hiện nút gửi lại", async () => {

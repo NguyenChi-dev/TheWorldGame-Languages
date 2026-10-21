@@ -38,6 +38,14 @@ export async function verifyPlayer(token: string | undefined): Promise<PlayerIde
   const userId = claims?.claims?.sub;
   if (error || typeof userId !== "string") throw new AuthFailure("Phiên đăng nhập không hợp lệ");
 
+  // getClaims chỉ kiểm tra chữ ký JWT tại chỗ: hỏi lại Supabase Auth để chặn người chơi đã bị khóa hoặc
+  // phiên đã bị thu hồi (token cũ vẫn đúng chữ ký tới khi hết hạn ~1 giờ).
+  const { data: account, error: accountError } = await supabase.auth
+    .getUser(token)
+    .catch(() => ({ data: { user: null }, error: true }));
+  if (accountError || account.user?.id !== userId)
+    throw new AuthFailure("Tài khoản đã bị khóa hoặc phiên đăng nhập đã hết hạn");
+
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("username, appearance, land_id")

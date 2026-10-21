@@ -56,6 +56,20 @@ export const auth = createMiddleware<AuthEnv>(async (c, next) => {
     throw new ApiError(401, Messages.invalidSession);
   }
 
+  // Hỏi lại Supabase Auth: JWT ký ES256 được getClaims kiểm tra tại chỗ, nên token của phiên đã bị thu hồi
+  // (đăng xuất mọi nơi) hoặc tài khoản đã bị khóa vẫn "hợp lệ" tới khi hết hạn (~1 giờ). Áp dụng cho MỌI
+  // route cần đăng nhập (/me của người chơi lẫn /admin). Mất kết nối → 503, không coi là đăng xuất.
+  const account = await supabase.auth
+    .getUser(token)
+    .catch((failure: unknown) => ({ data: { user: null }, error: failure }));
+  if (account.error) {
+    const status = (account.error as { status?: number }).status ?? 0;
+    if (isAuthRetryableFetchError(account.error) || status === 0 || status >= 500)
+      throw new ApiError(503, Messages.supabaseUnavailable);
+    throw new ApiError(401, Messages.invalidSession);
+  }
+  if (account.data.user?.id !== claims.sub) throw new ApiError(401, Messages.invalidSession);
+
   c.set("user", { id: claims.sub, email: claims.email || null, aal: claims.aal ?? "aal1" });
   c.set("accessToken", token);
   await next();

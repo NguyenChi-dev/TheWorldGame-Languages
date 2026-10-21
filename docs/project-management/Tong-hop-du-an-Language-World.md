@@ -49,7 +49,7 @@ Game engine không import React. Play gọi startGame và nhận callback. API l
 
 ### Admin
 
-- Auth và MFA
+- Auth và MFA (chi tiết: [docs/xac-thuc-phan-quyen.md](../xac-thuc-phan-quyen.md))
 
 - Role based access
 
