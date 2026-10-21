@@ -34,6 +34,21 @@
   --animate-pulse-ring: pulse-ring 2.2s ease-out infinite;
   --animate-drift: drift 14s ease-in-out infinite alternate;
   --animate-bob: bob 4.5s ease-in-out infinite;
+  /* Mục con trên thanh bên trượt xuống khi mở mục cha. */
+  --animate-submenu: submenu-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Nội dung tab của trang hiện dần khi đổi tab. */
+  --animate-tab-in: submenu-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes submenu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 
   @keyframes drift {
     from {
@@ -203,4 +218,31 @@ html {
 
 body {
   @apply bg-slate-100 text-slate-900 antialiased;
+}
+
+/*
+ * Thanh cuộn theo tông hồng của trang quản trị: mảnh, bo tròn, nền trong suốt.
+ * Firefox dùng scrollbar-color / scrollbar-width; Chrome, Edge, Safari dùng ::-webkit-scrollbar.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 55%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 55%, transparent) padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-rose-mid) padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }

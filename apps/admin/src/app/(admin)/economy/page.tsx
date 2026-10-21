@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ADMIN_SECTIONS } from "@lw/shared";
-import { PageHeader, sectionTabs } from "@/components/page-header";
+import { PageHeader, TabContent, sectionTabs } from "@/components/page-header";
 import { PlaceholderPanel } from "@/components/placeholder-panel";
 import { requireSection } from "@/lib/auth";
 
@@ -15,7 +15,9 @@ export default async function EconomyPage({ searchParams }: { searchParams: Prom
     <>
       <PageHeader section="economy" />
       {bar}
-      <PlaceholderPanel title={active?.label} />
+      <TabContent tab={active?.key}>
+        <PlaceholderPanel title={active?.label} />
+      </TabContent>
     </>
   );
 }

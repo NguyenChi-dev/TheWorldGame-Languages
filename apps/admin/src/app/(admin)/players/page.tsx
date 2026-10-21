@@ -21,7 +21,7 @@ import {
 } from "@lw/shared/api";
 import { FaIcon } from "@/components/fa-icon";
 import { fieldClass } from "@/components/fields";
-import { PageHeader, sectionTabs } from "@/components/page-header";
+import { PageHeader, TabContent, sectionTabs } from "@/components/page-header";
 import { PlaceholderPanel } from "@/components/placeholder-panel";
 import { Tabs } from "@/components/tabs";
 import { ApiCallError, apiRequest } from "@/lib/api";
@@ -98,7 +98,9 @@ export default async function PlayersPage({ searchParams }: { searchParams: Sear
       <>
         <PageHeader section="players" />
         {bar}
-        <PlaceholderPanel title={active.label} />
+        <TabContent tab={active.key}>
+          <PlaceholderPanel title={active.label} />
+        </TabContent>
       </>
     );
   }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ADMIN_SECTIONS } from "@lw/shared";
-import { PageHeader, sectionTabs } from "@/components/page-header";
+import { PageHeader, TabContent, sectionTabs } from "@/components/page-header";
 import { PlaceholderPanel } from "@/components/placeholder-panel";
 import { requireSection } from "@/lib/auth";
 import { cloudinaryCloudName } from "@/lib/cloudinary";
@@ -18,24 +18,26 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
     <>
       <PageHeader section="media" />
       {bar}
-      {active?.key === "images" ? (
-        <>
-          <CloudinaryStatus cloudName={cloudinaryCloudName()} />
-          <PlaceholderPanel title="Thư viện hình ảnh">
-            Ảnh bìa vùng đất / khu vực đã tải lên được ngay trong từng trang Vùng đất.
+      <TabContent tab={active?.key}>
+        {active?.key === "images" ? (
+          <>
+            <CloudinaryStatus cloudName={cloudinaryCloudName()} />
+            <PlaceholderPanel title="Thư viện hình ảnh">
+              Ảnh bìa vùng đất / khu vực đã tải lên được ngay trong từng trang Vùng đất.
+            </PlaceholderPanel>
+          </>
+        ) : active?.key === "models" ? (
+          <PlaceholderPanel title={active.label}>
+            Hiện có thể thêm mô hình GLB trong{" "}
+            <Link href="/map-editor" className="font-semibold text-accent hover:underline">
+              Thiết kế bản đồ 3D
+            </Link>
+            .
           </PlaceholderPanel>
-        </>
-      ) : active?.key === "models" ? (
-        <PlaceholderPanel title={active.label}>
-          Hiện thêm mô hình GLB trong{" "}
-          <Link href="/map-editor" className="font-semibold text-accent hover:underline">
-            Thiết kế bản đồ 3D
-          </Link>
-          .
-        </PlaceholderPanel>
-      ) : (
-        <PlaceholderPanel title={active?.label} />
-      )}
+        ) : (
+          <PlaceholderPanel title={active?.label} />
+        )}
+      </TabContent>
     </>
   );
 }

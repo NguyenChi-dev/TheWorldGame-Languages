@@ -19,8 +19,10 @@ export interface SidebarItem {
   label: string;
   /** Nhóm trên thanh bên (Nội dung học, Kinh tế, Vận hành); null = không thuộc nhóm (Tổng quan). */
   group: AdminSectionGroup | null;
-  /** Mục con, hiện ra bên dưới khi đang ở trong mục này (ví dụ Vùng đất › Kỹ năng luyện tập). */
+  /** Mục con, hiện ra bên dưới khi đang ở trong mục này (ví dụ Vùng đất › Thiết kế bản đồ 3D). */
   children?: readonly { href: string; label: string }[];
+  /** Số nhỏ bên phải (ví dụ số việc đang chờ). Không có thì không hiện. */
+  badge?: number;
 }
 
 /** Mục con đang mở: mục có đường dẫn khớp dài nhất (/lands/skills thắng /lands). */
@@ -31,15 +33,35 @@ function activeChildHref(children: readonly { href: string }[], pathname: string
   return matches.sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
+/** Tên nhóm trên thanh bên; mục không thuộc nhóm nào (Tổng quan) nằm trong nhóm "Bắt đầu". */
+const groupLabel = (group: AdminSectionGroup | null) => (group ? ADMIN_SECTION_GROUPS[group] : "Bắt đầu");
+
+/** Chấm màu đầu mỗi nhóm (cùng tông hồng, đậm nhạt khác nhau để phân biệt nhóm). */
+const GROUP_DOT: Record<AdminSectionGroup | "start", string> = {
+  start: "bg-primary",
+  content: "bg-rose-mid",
+  economy: "bg-amber-400",
+  operations: "bg-accent",
+};
+
+/** Gom các mục liền nhau cùng nhóm thành từng khối (giữ thứ tự của ADMIN_SECTIONS). */
+function groupItems(items: SidebarItem[]) {
+  const groups: { group: AdminSectionGroup | null; items: SidebarItem[] }[] = [];
+  for (const item of items) {
+    const last = groups.at(-1);
+    if (last && last.group === item.group) last.items.push(item);
+    else groups.push({ group: item.group, items: [item] });
+  }
+  return groups;
+}
+
+const iconButtonClass =
+  "flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-secondary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+
 function SignOutButton() {
   return (
     <form action={signOut}>
-      <button
-        type="submit"
-        aria-label="Đăng xuất"
-        title="Đăng xuất"
-        className="flex size-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-secondary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      >
+      <button type="submit" aria-label="Đăng xuất" title="Đăng xuất" className={iconButtonClass}>
         <LogOutIcon className="size-4.5" />
       </button>
     </form>
@@ -47,8 +69,9 @@ function SignOutButton() {
 }
 
 /**
- * Thanh bên gọn: logo nhỏ, menu có icon chia theo nhóm, thẻ người dùng 1 dòng.
- * - Máy tính: thu gọn còn cột icon (nút ở cuối menu, hoặc Ctrl/⌘ + B); rê chuột vào icon để xem tên.
+ * Thanh bên: logo + tên + khẩu hiệu, menu chia nhóm (icon trong vòng tròn, mục đang mở là "viên thuốc"
+ * nổi có icon tô màu), thẻ người dùng bo tròn ở cuối. Màu theo bảng màu hồng của trang quản trị.
+ * - Máy tính: thu gọn còn cột icon (nút tròn trên mép phải, hoặc Ctrl/⌘ + B); rê chuột vào icon để xem tên.
  * - Điện thoại: menu thu vào nút ☰ ở dải trên cùng, bấm để mở danh sách dọc (chuyển trang thì tự đóng).
  * Danh sách `items` đã được lọc theo vai trò ở máy chủ (app/(admin)/layout.tsx).
  */
@@ -97,22 +120,33 @@ export function Sidebar({
 
   // Khi thu gọn: chữ chỉ ẩn trên màn hình rộng (md:sr-only vẫn cho trình đọc màn hình đọc được).
   const hideWhenCollapsed = collapsed ? "md:sr-only" : "";
+  const initial = (email ?? "?").charAt(0).toUpperCase();
 
   return (
     <aside
-      className={`flex shrink-0 flex-col border-b border-secondary bg-white transition-[width] duration-200 md:sticky md:top-0 md:h-dvh md:border-b-0 md:border-r ${
-        collapsed ? "md:w-16" : "md:w-56"
+      className={`relative z-10 flex shrink-0 flex-col border-b border-secondary bg-white transition-[width] duration-200 md:sticky md:top-0 md:h-dvh md:border-b-0 md:border-r ${
+        collapsed ? "md:w-20" : "md:w-72"
       }`}
     >
+      {/* Đầu thanh bên: logo + tên + khẩu hiệu. */}
       <div
-        className={`flex h-14 items-center justify-between px-4 ${collapsed ? "md:justify-center md:px-0" : ""}`}
+        className={`flex items-center justify-between gap-3 px-4 py-3 md:border-b md:border-secondary md:py-5 ${
+          collapsed ? "md:justify-center md:px-0" : "md:px-5"
+        }`}
       >
-        <Link href="/" className="flex items-center gap-2.5" title={collapsed ? "Tổng quan" : undefined}>
-          <Image src={logo} alt="The World Language" sizes="40px" className="h-8 w-auto" />
-          <span
-            className={`whitespace-nowrap font-game text-lg font-extrabold text-accent ${hideWhenCollapsed}`}
-          >
-            LW Admin
+        <Link
+          href="/"
+          className="flex min-w-0 items-center gap-3"
+          title={collapsed ? "Tổng quan" : undefined}
+        >
+          <Image src={logo} alt="The World Language" sizes="56px" className="h-10 w-auto shrink-0 md:h-12" />
+          <span className={`min-w-0 ${hideWhenCollapsed}`}>
+            <span className="block whitespace-nowrap font-game text-xl font-extrabold leading-tight text-slate-900">
+              Language<span className="text-accent">World</span>
+            </span>
+            <span className="hidden text-xs leading-snug text-slate-500 md:block">
+              Trang quản trị. Dựng thế giới học ngôn ngữ của bạn.
+            </span>
           </span>
         </Link>
         <div className="flex items-center gap-1 md:hidden">
@@ -123,124 +157,158 @@ export function Sidebar({
             aria-expanded={mobileOpen}
             aria-controls="admin-nav"
             aria-label={mobileOpen ? "Đóng menu" : "Mở menu"}
-            className="flex size-9 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-secondary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className={iconButtonClass}
           >
             <FaIcon icon={mobileOpen ? faXmark : faBars} />
           </button>
         </div>
       </div>
 
+      {/* Nút thu gọn / mở rộng: vòng tròn nằm trên mép phải (chỉ máy tính). */}
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+        title={`${collapsed ? "Mở rộng" : "Thu gọn"} (Ctrl + B)`}
+        className="absolute -right-4 top-22 z-20 hidden size-8 items-center justify-center rounded-full bg-white text-slate-500 shadow-md ring-4 ring-background transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-primary md:flex"
+      >
+        <SidebarToggleIcon
+          className={`size-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`}
+        />
+      </button>
+
       <nav
         id="admin-nav"
-        className={`${mobileOpen ? "flex" : "hidden"} flex-col gap-1 px-2 pb-2 md:flex md:flex-1 md:overflow-y-auto md:overflow-x-hidden md:py-2`}
+        aria-label="Menu quản trị"
+        className={`${mobileOpen ? "flex" : "hidden"} flex-col gap-3 px-3 pb-3 md:flex md:flex-1 md:overflow-y-auto md:overflow-x-hidden md:py-3`}
       >
-        {items.map((item, index) => {
-          // Route con (ví dụ /lands/en/areas/...) vẫn tô sáng mục cha.
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          const Icon = SECTION_META[item.key].icon;
-          // Tiêu đề nhóm hiện trước mục đầu tiên của mỗi nhóm (chỉ máy tính; thu gọn thì thành vạch ngăn).
-          const startsGroup = item.group !== null && item.group !== items[index - 1]?.group;
-          return (
-            <Fragment key={item.href}>
-              {startsGroup && item.group ? (
-                collapsed ? (
-                  <div aria-hidden="true" className="mx-3 my-2 hidden h-px bg-secondary md:block" />
-                ) : (
-                  <p className="hidden px-3 pb-1 pt-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 md:block">
-                    {ADMIN_SECTION_GROUPS[item.group]}
-                  </p>
-                )
-              ) : null}
-              <Link
-                href={item.href}
-                aria-current={active && !item.children ? "page" : undefined}
-                title={collapsed ? item.label : undefined}
-                className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  collapsed ? "md:justify-center md:px-0" : ""
-                } ${
-                  active
-                    ? "bg-secondary font-semibold text-accent"
-                    : "font-medium text-slate-600 hover:bg-background hover:text-slate-900"
-                }`}
-              >
-                <Icon className={`size-4.5 shrink-0 ${active ? "text-accent" : "text-slate-400"}`} />
-                <span className={hideWhenCollapsed}>{item.label}</span>
-              </Link>
-              {/* Mục con: chỉ hiện khi đang ở trong mục cha và thanh bên không thu gọn. */}
-              {active && item.children && !collapsed ? (
-                <div className="flex shrink-0 gap-1 md:ml-5 md:flex-col md:border-l md:border-secondary md:pl-2">
-                  {item.children.map((child) => {
-                    const childActive = activeChildHref(item.children ?? [], pathname) === child.href;
-                    return (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        aria-current={childActive ? "page" : undefined}
-                        className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                          childActive
-                            ? "bg-secondary/70 font-semibold text-accent"
-                            : "text-slate-500 hover:bg-background hover:text-slate-900"
+        {groupItems(items).map(({ group, items: groupItemsList }) => (
+          // Mỗi nhóm là một khối riêng (nền nhạt, viền), tiêu đề nhóm + số mục ở trên.
+          <section
+            key={group ?? "start"}
+            aria-label={groupLabel(group)}
+            className={`rounded-2xl border border-secondary bg-white ${collapsed ? "md:p-1" : "p-1.5"}`}
+          >
+            <h2
+              className={`flex items-center gap-2 px-2.5 pb-1.5 pt-1.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-700 ${
+                collapsed ? "md:sr-only" : ""
+              }`}
+            >
+              <span aria-hidden="true" className={`size-2 rounded-full ${GROUP_DOT[group ?? "start"]}`} />
+              {groupLabel(group)}
+              <span className="ml-auto rounded-full bg-secondary px-1.5 text-[10px] font-bold tracking-normal text-accent">
+                {groupItemsList.length}
+              </span>
+            </h2>
+            <div className="flex flex-col gap-0.5">
+              {groupItemsList.map((item) => {
+                // Route con (ví dụ /lands/en/areas/...) vẫn tô sáng mục cha.
+                const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                const Icon = SECTION_META[item.key].icon;
+                return (
+                  <Fragment key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={active && !item.children ? "page" : undefined}
+                      title={collapsed ? item.label : undefined}
+                      className={`group relative flex shrink-0 items-center gap-3 whitespace-nowrap rounded-xl p-1 pr-2.5 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        collapsed ? "md:justify-center md:pr-1" : ""
+                      } ${
+                        active
+                          ? "bg-secondary font-semibold text-accent"
+                          : "font-medium text-slate-600 hover:bg-secondary/50 hover:text-slate-900"
+                      }`}
+                    >
+                      <span
+                        className={`flex size-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                          active
+                            ? "bg-accent text-white"
+                            : "bg-white text-slate-500 ring-1 ring-secondary group-hover:text-accent"
                         }`}
                       >
-                        {child.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </Fragment>
-          );
-        })}
+                        <Icon className="size-4" />
+                      </span>
+                      <span className={`flex-1 ${hideWhenCollapsed}`}>{item.label}</span>
+                      {item.badge ? (
+                        <span
+                          className={`flex min-w-6 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-bold leading-6 text-white ${
+                            collapsed
+                              ? "md:absolute md:-right-1 md:-top-1 md:min-w-5 md:text-[10px] md:leading-5"
+                              : ""
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </Link>
+                    {/* Mục con: chỉ hiện khi đang ở trong mục cha và thanh bên không thu gọn. */}
+                    {active && item.children && !collapsed ? (
+                      <div className="mb-2 mt-1.5 flex shrink-0 gap-1 md:ml-7 md:flex-col md:border-l-2 md:border-secondary md:pl-3">
+                        {item.children.map((child, childIndex) => {
+                          const childActive = activeChildHref(item.children ?? [], pathname) === child.href;
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              aria-current={childActive ? "page" : undefined}
+                              // Trượt xuống lần lượt khi mở mục cha (tắt nếu người dùng chọn giảm chuyển động).
+                              style={{ animationDelay: `${childIndex * 45}ms` }}
+                              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-[13px] transition-colors motion-safe:animate-submenu focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                                childActive
+                                  ? "bg-secondary/60 font-semibold text-accent"
+                                  : "text-slate-500 hover:bg-secondary/40 hover:text-slate-900"
+                              }`}
+                            >
+                              {child.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </nav>
 
-      {/* Nút thu gọn / mở rộng (chỉ máy tính). */}
-      <div className="hidden px-2 pb-2 md:block">
-        <button
-          type="button"
-          onClick={toggle}
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
-          title={`${collapsed ? "Mở rộng" : "Thu gọn"} (Ctrl + B)`}
-          className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-background hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-            collapsed ? "justify-center px-0" : ""
+      {/* Thẻ người dùng (máy tính). Thu gọn: chỉ còn ảnh đại diện + các nút xếp dọc. */}
+      <div className="hidden border-t border-secondary p-3 md:block">
+        <div
+          className={`flex gap-2 rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-secondary ${
+            collapsed ? "flex-col items-center px-1.5" : "items-center"
           }`}
         >
-          <SidebarToggleIcon
-            className={`size-4.5 shrink-0 text-slate-400 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`}
-          />
-          <span className={hideWhenCollapsed}>Thu gọn</span>
-        </button>
-      </div>
-
-      {/* Thẻ người dùng (máy tính). Thu gọn: chỉ còn chữ cái đầu + nút đăng xuất xếp dọc. */}
-      <div
-        className={`hidden gap-2.5 border-t border-secondary p-3 md:flex ${
-          collapsed ? "flex-col items-center px-0" : "items-center"
-        }`}
-      >
-        <span
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white"
-          title={collapsed ? `${email ?? ""} · ${roleLabel}` : undefined}
-        >
-          {(email ?? "?").charAt(0).toUpperCase()}
-        </span>
-        <div className={`min-w-0 flex-1 ${hideWhenCollapsed}`}>
-          <p className="truncate text-xs font-semibold text-slate-800" title={email ?? undefined}>
-            {email}
-          </p>
-          <p className="text-[11px] text-slate-500">{roleLabel}</p>
-        </div>
-        {needsMfa ? (
-          <Link
-            href={`/login/mfa?next=${encodeURIComponent(pathname)}`}
-            aria-label="Xác thực hai lớp"
-            title="Xác thực hai lớp: cần cho đổi vai trò, quản lý tài khoản người chơi, xóa nội dung"
-            className="flex size-8 items-center justify-center rounded-lg text-amber-600 transition-colors hover:bg-secondary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          <span
+            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent font-game text-base font-bold text-white"
+            title={collapsed ? `${email ?? ""} · ${roleLabel}` : undefined}
           >
-            <ShieldIcon className="size-4.5" />
-          </Link>
-        ) : null}
-        <SignOutButton />
+            {initial}
+          </span>
+          <div className={`ml-1 min-w-0 flex-1 ${hideWhenCollapsed}`}>
+            <p className="truncate text-sm font-bold text-slate-900" title={email ?? undefined}>
+              {email}
+            </p>
+            <p className="truncate text-xs font-medium text-accent">{roleLabel}</p>
+          </div>
+          {needsMfa ? (
+            <Link
+              href={`/login/mfa?next=${encodeURIComponent(pathname)}`}
+              aria-label="Xác thực hai lớp"
+              title="Xác thực hai lớp: cần cho đổi vai trò, quản lý tài khoản người chơi, xóa nội dung"
+              className={`relative ${iconButtonClass} text-amber-600`}
+            >
+              <ShieldIcon className="size-4.5" />
+              <span
+                aria-hidden="true"
+                className="absolute right-1.5 top-1.5 size-2 rounded-full bg-amber-500 ring-2 ring-white"
+              />
+            </Link>
+          ) : null}
+          <SignOutButton />
+        </div>
       </div>
     </aside>
   );

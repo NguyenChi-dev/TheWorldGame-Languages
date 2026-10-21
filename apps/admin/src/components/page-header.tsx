@@ -30,3 +30,15 @@ export function sectionTabs(
     ) : null;
   return { active, bar };
 }
+
+/**
+ * Nội dung của tab đang mở. Đổi tab thì khối này được dựng lại (key = tab) nên chạy hiệu ứng hiện dần;
+ * người dùng chọn "giảm chuyển động" thì không chạy.
+ */
+export function TabContent({ tab, children }: { tab: string | undefined; children: React.ReactNode }) {
+  return (
+    <div key={tab} role="tabpanel" className="motion-safe:animate-tab-in">
+      {children}
+    </div>
+  );
+}

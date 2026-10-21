@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ADMIN_SECTIONS, can } from "@lw/shared";
-import { PageHeader, sectionTabs } from "@/components/page-header";
+import { PageHeader, TabContent, sectionTabs } from "@/components/page-header";
 import { PlaceholderPanel } from "@/components/placeholder-panel";
 import { requireSection } from "@/lib/auth";
 import { coverUrlOf, embeddedCount, toLand, toSkill } from "@/lib/content";
@@ -34,11 +34,13 @@ export default async function LandsPage({ searchParams }: { searchParams: Promis
       <>
         <PageHeader section="lands" />
         {bar}
-        <p className="mb-3 text-sm text-slate-500">
-          Mỗi khu vực luyện một kỹ năng. Danh sách kỹ năng dùng chung cho mọi vùng đất; khu vực của từng vùng
-          đất nằm trong trang của vùng đất đó.
-        </p>
-        <SkillsManager rows={rows} canDelete={canDelete} />
+        <TabContent tab={active?.key}>
+          <p className="mb-3 text-sm text-slate-500">
+            Mỗi khu vực luyện một kỹ năng. Danh sách kỹ năng dùng chung cho mọi vùng đất; khu vực của từng
+            vùng đất nằm trong trang của vùng đất đó.
+          </p>
+          <SkillsManager rows={rows} canDelete={canDelete} />
+        </TabContent>
       </>
     );
   }
@@ -48,10 +50,12 @@ export default async function LandsPage({ searchParams }: { searchParams: Promis
       <>
         <PageHeader section="lands" />
         {bar}
-        <PlaceholderPanel title={active.label} message="Đã có trong danh sách">
-          Bật/tắt bằng công tắc và kéo thả để đổi thứ tự ngay ở tab “Vùng đất (ngôn ngữ)”. Thứ tự mở khóa khu
-          vực đổi trong trang của từng vùng đất.
-        </PlaceholderPanel>
+        <TabContent tab={active?.key}>
+          <PlaceholderPanel title={active.label} message="Đã có trong danh sách">
+            Bật/tắt bằng công tắc và kéo thả để đổi thứ tự ngay ở tab “Vùng đất (ngôn ngữ)”. Thứ tự mở khóa
+            khu vực đổi trong trang của từng vùng đất.
+          </PlaceholderPanel>
+        </TabContent>
       </>
     );
   }
@@ -72,7 +76,9 @@ export default async function LandsPage({ searchParams }: { searchParams: Promis
     <>
       <PageHeader section="lands" />
       {bar}
-      <LandsManager rows={rows} canDelete={canDelete} />
+      <TabContent tab={active?.key}>
+        <LandsManager rows={rows} canDelete={canDelete} />
+      </TabContent>
     </>
   );
 }
